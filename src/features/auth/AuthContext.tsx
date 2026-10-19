@@ -29,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [isMockMode, setIsMockMode] = useState<boolean>(!env.isConfigured && env.isMockAuthEnabled);
+  const [isMockMode, setIsMockMode] = useState<boolean>(env.isMockAuthEnabled || !env.isConfigured);
 
   // Fetch or sync public profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -59,8 +59,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     async function initAuth() {
       setIsLoading(true);
 
-      // Check live Supabase session if configured
-      if (env.isConfigured) {
+      // Check live Supabase session if configured and mock auth is not forced
+      if (env.isConfigured && !env.isMockAuthEnabled) {
         try {
           const { data: { session: currentSession }, error: sessionErr } = await supabase.auth.getSession();
           if (sessionErr) throw sessionErr;

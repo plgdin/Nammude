@@ -18,8 +18,8 @@ export function getAppEnvironment(): AppEnvironment {
   const isConfigured =
     Boolean(supabaseUrl) &&
     Boolean(supabaseAnonKey) &&
-    !supabaseUrl.includes('placeholder-project') &&
-    !supabaseAnonKey.includes('placeholder-anon-key');
+    !supabaseUrl.includes('placeholder') &&
+    !supabaseAnonKey.includes('placeholder');
 
   return {
     supabaseUrl,
@@ -30,4 +30,9 @@ export function getAppEnvironment(): AppEnvironment {
   };
 }
 
-export const env = getAppEnvironment();
+export const env = new Proxy({} as AppEnvironment, {
+  get(_target, prop: keyof AppEnvironment) {
+    return getAppEnvironment()[prop];
+  },
+});
+
