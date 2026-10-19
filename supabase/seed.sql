@@ -11,24 +11,73 @@ TRUNCATE TABLE public.organizations CASCADE;
 TRUNCATE TABLE public.profiles CASCADE;
 
 -- ------------------------------------------------------------------------------
--- 1. Create Profiles for Test Users
+-- 1. Create Test Users in auth.users & auth.identities
 -- ------------------------------------------------------------------------------
--- Fixed UUIDs for predictable testing and automated isolation suites
--- Org 1 (Harbor Café) Users:
--- Owner:   a1111111-1111-1111-1111-111111111111
--- Cashier: a2222222-2222-2222-2222-222222222222
--- Kitchen: a3333333-3333-3333-3333-333333333333
+-- Required for public.profiles(id) and public.memberships(user_id) foreign key references
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- Org 2 (Marian Bistro) Users:
--- Owner:   b1111111-1111-1111-1111-111111111111
--- Cashier: b2222222-2222-2222-2222-222222222222
+INSERT INTO auth.users (
+    id,
+    instance_id,
+    aud,
+    role,
+    email,
+    encrypted_password,
+    email_confirmed_at,
+    raw_app_meta_data,
+    raw_user_meta_data,
+    created_at,
+    updated_at
+) VALUES
+('a1111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sarah.owner@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Sarah Jenkins"}'::jsonb, now(), now()),
+('a2222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'marco.cashier@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marco Silva"}'::jsonb, now(), now()),
+('a3333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'elena.kitchen@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Elena Rostova"}'::jsonb, now(), now()),
+('b1111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'marian.owner@marianbistro.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marian Vance"}'::jsonb, now(), now()),
+('b2222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'david.cashier@marianbistro.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"David Lopez"}'::jsonb, now(), now())
+ON CONFLICT (id) DO UPDATE SET
+    encrypted_password = EXCLUDED.encrypted_password,
+    raw_user_meta_data = EXCLUDED.raw_user_meta_data,
+    updated_at = now();
 
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_schema = 'auth' AND table_name = 'identities' AND column_name = 'provider_id'
+    ) THEN
+        INSERT INTO auth.identities (id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at)
+        VALUES
+        ('a1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', format('{"sub":"%s","email":"%s"}', 'a1111111-1111-1111-1111-111111111111', 'sarah.owner@harborcafe.com')::jsonb, 'email', 'sarah.owner@harborcafe.com', now(), now(), now()),
+        ('a2222222-2222-2222-2222-222222222222', 'a2222222-2222-2222-2222-222222222222', format('{"sub":"%s","email":"%s"}', 'a2222222-2222-2222-2222-222222222222', 'marco.cashier@harborcafe.com')::jsonb, 'email', 'marco.cashier@harborcafe.com', now(), now(), now()),
+        ('a3333333-3333-3333-3333-333333333333', 'a3333333-3333-3333-3333-333333333333', format('{"sub":"%s","email":"%s"}', 'a3333333-3333-3333-3333-333333333333', 'elena.kitchen@harborcafe.com')::jsonb, 'email', 'elena.kitchen@harborcafe.com', now(), now(), now()),
+        ('b1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', format('{"sub":"%s","email":"%s"}', 'b1111111-1111-1111-1111-111111111111', 'marian.owner@marianbistro.com')::jsonb, 'email', 'marian.owner@marianbistro.com', now(), now(), now()),
+        ('b2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222', format('{"sub":"%s","email":"%s"}', 'b2222222-2222-2222-2222-222222222222', 'david.cashier@marianbistro.com')::jsonb, 'email', 'david.cashier@marianbistro.com', now(), now(), now())
+        ON CONFLICT DO NOTHING;
+    ELSE
+        INSERT INTO auth.identities (id, user_id, identity_data, provider, last_sign_in_at, created_at, updated_at)
+        VALUES
+        ('a1111111-1111-1111-1111-111111111111', 'a1111111-1111-1111-1111-111111111111', format('{"sub":"%s","email":"%s"}', 'a1111111-1111-1111-1111-111111111111', 'sarah.owner@harborcafe.com')::jsonb, 'email', now(), now(), now()),
+        ('a2222222-2222-2222-2222-222222222222', 'a2222222-2222-2222-2222-222222222222', format('{"sub":"%s","email":"%s"}', 'a2222222-2222-2222-2222-222222222222', 'marco.cashier@harborcafe.com')::jsonb, 'email', now(), now(), now()),
+        ('a3333333-3333-3333-3333-333333333333', 'a3333333-3333-3333-3333-333333333333', format('{"sub":"%s","email":"%s"}', 'a3333333-3333-3333-3333-333333333333', 'elena.kitchen@harborcafe.com')::jsonb, 'email', now(), now(), now()),
+        ('b1111111-1111-1111-1111-111111111111', 'b1111111-1111-1111-1111-111111111111', format('{"sub":"%s","email":"%s"}', 'b1111111-1111-1111-1111-111111111111', 'marian.owner@marianbistro.com')::jsonb, 'email', now(), now(), now()),
+        ('b2222222-2222-2222-2222-222222222222', 'b2222222-2222-2222-2222-222222222222', format('{"sub":"%s","email":"%s"}', 'b2222222-2222-2222-2222-222222222222', 'david.cashier@marianbistro.com')::jsonb, 'email', now(), now(), now())
+        ON CONFLICT DO NOTHING;
+    END IF;
+END $$;
+
+-- ------------------------------------------------------------------------------
+-- 2. Create Profiles for Test Users
+-- ------------------------------------------------------------------------------
 INSERT INTO public.profiles (id, email, full_name, phone, is_platform_admin) VALUES
 ('a1111111-1111-1111-1111-111111111111', 'sarah.owner@harborcafe.com', 'Sarah Jenkins', '+1 (555) 101-2001', FALSE),
 ('a2222222-2222-2222-2222-222222222222', 'marco.cashier@harborcafe.com', 'Marco Silva', '+1 (555) 101-2002', FALSE),
 ('a3333333-3333-3333-3333-333333333333', 'elena.kitchen@harborcafe.com', 'Elena Rostova', '+1 (555) 101-2003', FALSE),
 ('b1111111-1111-1111-1111-111111111111', 'marian.owner@marianbistro.com', 'Marian Vance', '+1 (555) 202-3001', FALSE),
-('b2222222-2222-2222-2222-222222222222', 'david.cashier@marianbistro.com', 'David Lopez', '+1 (555) 202-3002', FALSE);
+('b2222222-2222-2222-2222-222222222222', 'david.cashier@marianbistro.com', 'David Lopez', '+1 (555) 202-3002', FALSE)
+ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name,
+    phone = EXCLUDED.phone;
 
 -- ------------------------------------------------------------------------------
 -- 2. Organizations
