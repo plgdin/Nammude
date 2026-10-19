@@ -16,6 +16,19 @@ TRUNCATE TABLE public.profiles CASCADE;
 -- Required for public.profiles(id) and public.memberships(user_id) foreign key references
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
+-- Clean existing token columns in case previously inserted with NULL
+UPDATE auth.users
+SET 
+  confirmation_token = COALESCE(confirmation_token, ''),
+  email_change = COALESCE(email_change, ''),
+  email_change_token_new = COALESCE(email_change_token_new, ''),
+  recovery_token = COALESCE(recovery_token, '')
+WHERE 
+  confirmation_token IS NULL 
+  OR email_change IS NULL 
+  OR email_change_token_new IS NULL 
+  OR recovery_token IS NULL;
+
 INSERT INTO auth.users (
     id,
     instance_id,
@@ -27,16 +40,27 @@ INSERT INTO auth.users (
     raw_app_meta_data,
     raw_user_meta_data,
     created_at,
-    updated_at
+    updated_at,
+    confirmation_token,
+    recovery_token,
+    email_change,
+    email_change_token_new,
+    email_change_token_current,
+    phone_change,
+    phone_change_token
 ) VALUES
-('a1111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sarah.owner@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Sarah Jenkins"}'::jsonb, now(), now()),
-('a2222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'marco.cashier@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marco Silva"}'::jsonb, now(), now()),
-('a3333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'elena.kitchen@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Elena Rostova"}'::jsonb, now(), now()),
-('b1111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'marian.owner@marianbistro.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marian Vance"}'::jsonb, now(), now()),
-('b2222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'david.cashier@marianbistro.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"David Lopez"}'::jsonb, now(), now())
+('a1111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sarah.owner@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Sarah Jenkins"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
+('a2222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'marco.cashier@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marco Silva"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
+('a3333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'elena.kitchen@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Elena Rostova"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
+('b1111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'marian.owner@marianbistro.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marian Vance"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
+('b2222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'david.cashier@marianbistro.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"David Lopez"}'::jsonb, now(), now(), '', '', '', '', '', '', '')
 ON CONFLICT (id) DO UPDATE SET
     encrypted_password = EXCLUDED.encrypted_password,
     raw_user_meta_data = EXCLUDED.raw_user_meta_data,
+    confirmation_token = '',
+    recovery_token = '',
+    email_change = '',
+    email_change_token_new = '',
     updated_at = now();
 
 DO $$
