@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { currentTenant } from '@/config/tenant.config';
+import { useOrganization } from '@/features/organization/OrganizationContext';
+import { useAuth } from '@/features/auth/AuthContext';
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -10,10 +11,21 @@ import {
   ScanText,
   Coffee,
   ShieldCheck,
+  Building2,
+  ChevronDown,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 
 export const Sidebar: React.FC = () => {
+  const {
+    currentOrganization,
+    permittedOrganizations,
+    switchOrganization,
+    currentMembership,
+  } = useOrganization();
+  const { profile, user } = useAuth();
+
   const activeRoutes = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Point of Sale (POS)', path: '/pos', icon: UtensilsCrossed },
@@ -28,15 +40,56 @@ export const Sidebar: React.FC = () => {
 
   return (
     <aside className="hidden lg:flex w-64 flex-col border-r border-surface-border bg-surface select-none">
-      {/* Brand Header */}
-      <div className="flex h-16 items-center gap-3 border-b border-surface-border px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-brand text-brand-fg shadow">
-          <Coffee className="h-5 w-5" />
+      {/* Brand & Organization Switcher */}
+      <div className="flex h-16 items-center justify-between border-b border-surface-border px-4">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-fg shadow">
+            <Coffee className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-bold text-white tracking-tight truncate">
+              {currentOrganization?.name || 'Restaurant OS'}
+            </h2>
+            <p className="text-[10px] text-gray-400 font-mono truncate">
+              {currentOrganization?.slug || 'platform'}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-sm font-bold text-white tracking-tight">{currentTenant.name}</h2>
-          <p className="text-[11px] text-gray-400 font-medium">{currentTenant.tagline}</p>
-        </div>
+
+        {/* Multi-Tenant Switcher if user belongs to >1 organization */}
+        {permittedOrganizations.length > 1 && (
+          <DropdownMenu.Root>
+            <DropdownMenu.Trigger asChild>
+              <button
+                className="p-1 rounded-md text-gray-400 hover:text-white hover:bg-surface-elevated"
+                title="Switch Organization"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenu.Trigger>
+            <DropdownMenu.Portal>
+              <DropdownMenu.Content
+                className="z-50 min-w-[200px] overflow-hidden rounded-xl border border-surface-border bg-surface p-1.5 shadow-xl animate-in fade-in-50"
+                align="start"
+                sideOffset={5}
+              >
+                <DropdownMenu.Label className="px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                  Switch Organization
+                </DropdownMenu.Label>
+                {permittedOrganizations.map((org) => (
+                  <DropdownMenu.Item
+                    key={org.id}
+                    onClick={() => switchOrganization(org.id)}
+                    className="flex items-center gap-2 rounded-lg px-2.5 py-2 text-xs text-gray-200 cursor-pointer hover:bg-surface-elevated hover:text-white focus:bg-surface-elevated focus:outline-none"
+                  >
+                    <Building2 className="h-3.5 w-3.5 text-brand" />
+                    <span className="font-medium truncate">{org.name}</span>
+                  </DropdownMenu.Item>
+                ))}
+              </DropdownMenu.Content>
+            </DropdownMenu.Portal>
+          </DropdownMenu.Root>
+        )}
       </div>
 
       {/* Navigation Links */}
@@ -44,7 +97,7 @@ export const Sidebar: React.FC = () => {
         <div className="space-y-6">
           <div>
             <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-400 mb-2">
-              Phase 2 Active Screens
+              Operational Views
             </p>
             <nav className="space-y-1">
               {activeRoutes.map((route) => (
@@ -95,13 +148,17 @@ export const Sidebar: React.FC = () => {
         <div className="rounded-xl border border-surface-border bg-surface-elevated p-3">
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold text-xs">
-              M
+              {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">Marco S.</p>
+              <p className="text-xs font-medium text-white truncate">
+                {profile?.full_name || 'Staff User'}
+              </p>
               <p className="text-[10px] text-gray-400 flex items-center gap-1">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                Cashier • Shift Active
+                <span className="uppercase font-mono">
+                  {currentMembership?.role || 'staff'}
+                </span>
               </p>
             </div>
             <ShieldCheck className="h-4 w-4 text-gray-400" />
