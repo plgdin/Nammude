@@ -1,0 +1,46 @@
+:root {
+  /* Surface & Base Canvas */
+  --bg-canvas: #090d16;
+  --bg-surface: #111827;
+  --bg-surface-elevated: #1a2234;
+  --bg-surface-active: #243048;
+  --border-subtle: #243048;
+  --border-strong: #374151;
+
+  /* Tenant Configurable Tokens (Harbor Café default) */
+  --tenant-primary: #2563eb;
+  --tenant-primary-hover: #1d4ed8;
+  --tenant-primary-fg: #ffffff;
+  --tenant-accent: #f59e0b;
+
+  /* Semantic Status */
+  --status-success: #10b981;
+  --status-warning: #f59e0b;
+  --status-danger: #ef4444;
+  --status-info: #3b82f6;
+
+  /* Table / Floor Status */
+  --status-vacant: #10b981;
+  --status-occupied: #ef4444;
+  --status-billed: #f59e0b;
+  --status-reserved: #8b5cf6;
+  --status-dirty: #6b7280;
+
+  /* Touch Boundaries */
+  --touch-target-min: 48px;
+}
+
+/* Light Theme Support (when toggled on tenant level) */
+.light {
+  --bg-canvas: #f8fafc;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f1f5f9;
+  --bg-surface-active: #e2e8f0;
+  --border-subtle: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --tenant-primary: #2563eb;
+  --tenant-primary-hover: #1d4ed8;
+  --tenant-primary-fg: #ffffff;
+  --tenant-accent: #d97706;
+}
