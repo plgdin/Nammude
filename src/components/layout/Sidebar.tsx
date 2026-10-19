@@ -29,11 +29,11 @@ export const Sidebar: React.FC = () => {
   const activeRoutes = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Point of Sale (POS)', path: '/pos', icon: UtensilsCrossed },
+    { name: 'Kitchen KDS', path: '/kitchen', icon: CookingPot },
     { name: 'Inventory & Stock', path: '/inventory', icon: Boxes },
   ];
 
   const futureRoutes = [
-    { name: 'Kitchen KDS', icon: CookingPot, phase: 'Phase 4' },
     { name: 'Financial Ledger', icon: ReceiptText, phase: 'Phase 6' },
     { name: 'OCR Ingestion', icon: ScanText, phase: 'Phase 7' },
   ];

@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalDescription, ModalFooter } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency, roundMoney } from '@/lib/currency';
-import { CreditCard, Banknote, QrCode, CheckCircle2, Receipt, ArrowRight } from 'lucide-react';
+import { CreditCard, Banknote, QrCode, CheckCircle2, ArrowRight, AlertTriangle } from 'lucide-react';
+import { paymentService } from './services/paymentService';
+import { useOrganization } from '@/features/organization/OrganizationContext';
+import { useAuth } from '@/features/auth/AuthContext';
 
 interface PaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
+  orderId?: string;
   totalPayable: number;
   orderNumber: string;
   orderType: string;
@@ -17,30 +21,54 @@ interface PaymentModalProps {
 export const PaymentModal: React.FC<PaymentModalProps> = ({
   isOpen,
   onClose,
+  orderId,
   totalPayable,
   orderNumber,
   orderType,
   tableNumber,
   onPaymentSuccess,
 }) => {
-  const [method, setMethod] = useState<'card' | 'cash' | 'digital'>('card');
+  const { currentOrganization, currentBranch } = useOrganization();
+  const { user } = useAuth();
+
+  const [method, setMethod] = useState<'card' | 'cash' | 'upi_qr'>('card');
   const [tenderedCash, setTenderedCash] = useState<number>(Math.ceil(totalPayable));
   const [isProcessing, setIsProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
-  const [printReceipt, setPrintReceipt] = useState(true);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const changeDue = Math.max(0, roundMoney(tenderedCash - totalPayable));
 
-  const handleProcessPayment = () => {
+  const handleProcessPayment = async () => {
     setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-      setCompleted(true);
-    }, 600);
+    setErrorMessage(null);
+
+    const idempotencyKey = `pay-${orderId || orderNumber}-${Date.now()}`;
+
+    if (orderId && currentOrganization && currentBranch) {
+      const res = await paymentService.recordPayment({
+        organization_id: currentOrganization.id,
+        branch_id: currentBranch.id,
+        order_id: orderId,
+        payment_method: method,
+        amount: totalPayable,
+        idempotency_key: idempotencyKey,
+        settled_by: user?.id,
+      });
+
+      if (!res.success) {
+        setIsProcessing(false);
+        setErrorMessage(res.error || 'Failed to record settlement.');
+        return;
+      }
+    }
+
+    setIsProcessing(false);
+    setCompleted(true);
   };
 
   const handleFinish = () => {
-    onPaymentSuccess(method, tenderedCash, changeDue);
+    onPaymentSuccess(method, method === 'cash' ? tenderedCash : totalPayable, changeDue);
     setCompleted(false);
     onClose();
   };
@@ -58,139 +86,100 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 </span>
               </div>
               <ModalDescription>
-                Select payment tender method and finalize transaction.
+                Select payment method. Development sandbox flow: no live gateway charge.
               </ModalDescription>
             </ModalHeader>
 
-            <div className="space-y-5 py-2">
-              {/* Total Payable Prominent Hero */}
-              <div className="rounded-xl border border-surface-border bg-surface-elevated p-4 text-center">
-                <p className="text-xs uppercase tracking-wider text-gray-400 font-medium">
-                  Total Balance Due
-                </p>
-                <p className="text-3xl font-extrabold text-white mt-1">
-                  {formatCurrency(totalPayable)}
-                </p>
+            {/* Dev Mode Banner */}
+            <div className="flex items-center gap-2 p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+              <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
+              <span>Simulated Payment Gateway: Live provider integration scheduled for Phase 6.</span>
+            </div>
+
+            {errorMessage && (
+              <div className="p-2.5 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400">
+                {errorMessage}
               </div>
+            )}
 
-              {/* Tender Selector Tabs */}
-              <div className="grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setMethod('card')}
-                  className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-medium transition-all min-h-[56px] ${
-                    method === 'card'
-                      ? 'border-brand bg-brand/15 text-white shadow-sm'
-                      : 'border-surface-border bg-surface-elevated text-gray-300 hover:bg-surface-active'
-                  }`}
-                >
-                  <CreditCard className="h-5 w-5 mb-1 text-blue-400" />
-                  Card (EMV)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMethod('cash')}
-                  className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-medium transition-all min-h-[56px] ${
-                    method === 'cash'
-                      ? 'border-brand bg-brand/15 text-white shadow-sm'
-                      : 'border-surface-border bg-surface-elevated text-gray-300 hover:bg-surface-active'
-                  }`}
-                >
-                  <Banknote className="h-5 w-5 mb-1 text-emerald-400" />
-                  Cash Drawer
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMethod('digital')}
-                  className={`flex flex-col items-center justify-center p-3 rounded-xl border text-xs font-medium transition-all min-h-[56px] ${
-                    method === 'digital'
-                      ? 'border-brand bg-brand/15 text-white shadow-sm'
-                      : 'border-surface-border bg-surface-elevated text-gray-300 hover:bg-surface-active'
-                  }`}
-                >
-                  <QrCode className="h-5 w-5 mb-1 text-amber-400" />
-                  Digital / QR
-                </button>
-              </div>
-
-              {/* Cash Tender Details & Change Calculation */}
-              {method === 'cash' && (
-                <div className="space-y-3 rounded-xl border border-surface-border bg-surface-elevated p-4">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-300 font-medium">Quick Cash Presets:</span>
-                    <span className="text-gray-400">Tendered: {formatCurrency(tenderedCash)}</span>
-                  </div>
-
-                  <div className="grid grid-cols-4 gap-2">
-                    {[totalPayable, 20, 50, 100].map((amt, idx) => {
-                      const roundedAmt = idx === 0 ? Math.ceil(amt) : amt;
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          onClick={() => setTenderedCash(roundedAmt)}
-                          className={`py-2 px-1 rounded-lg border text-xs font-semibold ${
-                            tenderedCash === roundedAmt
-                              ? 'border-emerald-500 bg-emerald-950/60 text-emerald-300'
-                              : 'border-surface-border bg-surface text-gray-300 hover:bg-surface-active'
-                          }`}
-                        >
-                          {idx === 0 ? 'Exact' : `$${amt}`}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  <div className="flex items-center justify-between pt-2 border-t border-surface-border text-sm">
-                    <span className="font-medium text-gray-300">Change Due:</span>
-                    <span className="font-bold text-emerald-400 text-base">
-                      {formatCurrency(changeDue)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              {/* Card Terminal Prompt */}
-              {method === 'card' && (
-                <div className="rounded-xl border border-surface-border bg-surface-elevated/70 p-4 text-center space-y-1">
-                  <p className="text-xs font-medium text-gray-300">
-                    Ready for contactless tap or chip insertion
-                  </p>
-                  <p className="text-[11px] text-gray-500">
-                    Simulating Pax / Verifone Ethernet Payment Terminal
-                  </p>
-                </div>
-              )}
-
-              {/* Digital Wallet Prompt */}
-              {method === 'digital' && (
-                <div className="rounded-xl border border-surface-border bg-surface-elevated/70 p-4 text-center space-y-1">
-                  <p className="text-xs font-medium text-gray-300">
-                    Customer Dynamic QR Display Active
-                  </p>
-                  <p className="text-[11px] text-gray-500">
-                    Supports Apple Pay, Google Wallet, UPI, and Venmo QR
-                  </p>
-                </div>
-              )}
-
-              {/* Print Receipt Toggle */}
-              <label className="flex items-center gap-2.5 text-xs text-gray-300 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={printReceipt}
-                  onChange={(e) => setPrintReceipt(e.target.checked)}
-                  className="rounded border-surface-border bg-surface-elevated text-brand focus:ring-brand h-4 w-4"
-                />
-                <Receipt className="h-4 w-4 text-gray-400" />
-                <span>Auto-print thermal customer receipt (ESC/POS 80mm)</span>
-              </label>
-
-              {/* Simulation Safety Disclaimer */}
-              <div className="rounded-lg bg-blue-950/40 border border-blue-900/60 p-2.5 text-[11px] text-blue-300 text-center">
-                Prototype Demonstration: Zero actual cards will be debited.
+            {/* Total Display */}
+            <div className="rounded-xl border border-surface-border bg-surface-elevated/60 p-4 text-center">
+              <span className="text-xs font-medium text-gray-400 uppercase tracking-wider">
+                Total Due
+              </span>
+              <div className="text-3xl font-black text-white tracking-tight mt-1">
+                {formatCurrency(totalPayable)}
               </div>
             </div>
+
+            {/* Payment Method Selector */}
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => setMethod('card')}
+                className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all min-h-[56px] ${
+                  method === 'card'
+                    ? 'border-brand bg-brand/15 text-white ring-1 ring-brand'
+                    : 'border-surface-border bg-surface-elevated text-gray-300 hover:bg-surface-active'
+                }`}
+              >
+                <CreditCard className="h-5 w-5" />
+                <span>Credit/Debit</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMethod('cash')}
+                className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all min-h-[56px] ${
+                  method === 'cash'
+                    ? 'border-brand bg-brand/15 text-white ring-1 ring-brand'
+                    : 'border-surface-border bg-surface-elevated text-gray-300 hover:bg-surface-active'
+                }`}
+              >
+                <Banknote className="h-5 w-5" />
+                <span>Cash Tender</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMethod('upi_qr')}
+                className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-xl border text-xs font-semibold transition-all min-h-[56px] ${
+                  method === 'upi_qr'
+                    ? 'border-brand bg-brand/15 text-white ring-1 ring-brand'
+                    : 'border-surface-border bg-surface-elevated text-gray-300 hover:bg-surface-active'
+                }`}
+              >
+                <QrCode className="h-5 w-5" />
+                <span>Digital / UPI</span>
+              </button>
+            </div>
+
+            {/* Cash Tender Calculation */}
+            {method === 'cash' && (
+              <div className="space-y-3 p-3.5 rounded-xl border border-surface-border bg-surface-elevated">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-400">Cash Received:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-gray-400 font-mono">$</span>
+                    <input
+                      type="number"
+                      step="1"
+                      min={totalPayable}
+                      value={tenderedCash}
+                      onChange={(e) => setTenderedCash(Number(e.target.value))}
+                      className="w-24 text-right rounded border border-surface-border bg-canvas px-2 py-1 text-sm font-bold text-white focus:outline-none focus:ring-1 focus:ring-brand font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2 border-t border-surface-border text-xs">
+                  <span className="font-semibold text-gray-300">Change Due:</span>
+                  <span className="text-sm font-bold text-emerald-400 font-mono">
+                    {formatCurrency(changeDue)}
+                  </span>
+                </div>
+              </div>
+            )}
 
             <ModalFooter>
               <Button variant="secondary" onClick={onClose} disabled={isProcessing}>
@@ -199,50 +188,41 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <Button
                 variant="primary"
                 onClick={handleProcessPayment}
-                isLoading={isProcessing}
-                className="w-full sm:w-auto"
+                disabled={isProcessing || (method === 'cash' && tenderedCash < totalPayable)}
               >
-                Complete Payment • {formatCurrency(totalPayable)}
+                {isProcessing ? 'Recording Settlement...' : `Confirm Payment • ${formatCurrency(totalPayable)}`}
               </Button>
             </ModalFooter>
           </>
         ) : (
-          /* Payment Success Confirmation View */
-          <div className="text-center py-6 space-y-4">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-950 text-emerald-400 border border-emerald-800">
+          /* Payment Success State */
+          <div className="py-6 text-center space-y-4">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
               <CheckCircle2 className="h-8 w-8" />
             </div>
+
             <div>
-              <h3 className="text-xl font-bold text-white">Payment Successful</h3>
-              <p className="text-xs text-gray-400 mt-1">
+              <h3 className="text-lg font-bold text-white">Payment Recorded</h3>
+              <p className="text-xs text-gray-400 mt-1 font-mono">
                 Order {orderNumber} settled via {method.toUpperCase()}
               </p>
             </div>
 
-            <div className="rounded-xl border border-surface-border bg-surface-elevated p-4 max-w-sm mx-auto space-y-1.5 text-xs text-left">
-              <div className="flex justify-between text-gray-400">
-                <span>Amount Paid:</span>
-                <span className="font-medium text-white">{formatCurrency(totalPayable)}</span>
+            {method === 'cash' && changeDue > 0 && (
+              <div className="p-3 rounded-lg bg-surface-elevated border border-surface-border text-xs">
+                <span className="text-gray-400">Please give customer: </span>
+                <span className="font-bold text-emerald-400 font-mono">
+                  {formatCurrency(changeDue)} change
+                </span>
               </div>
-              {method === 'cash' && (
-                <div className="flex justify-between text-emerald-400 font-semibold">
-                  <span>Change Given:</span>
-                  <span>{formatCurrency(changeDue)}</span>
-                </div>
-              )}
-              <div className="flex justify-between text-gray-400">
-                <span>Thermal Print:</span>
-                <span className="text-gray-300">{printReceipt ? 'Dispatched' : 'Skipped'}</span>
-              </div>
-              <div className="flex justify-between text-gray-400">
-                <span>Kitchen Ticket (KOT):</span>
-                <span className="text-emerald-400">Routed to Kitchen</span>
-              </div>
-            </div>
+            )}
 
-            <Button variant="primary" onClick={handleFinish} className="w-full max-w-sm mx-auto">
-              Start Next Order <ArrowRight className="ml-2 h-4 w-4" />
-            </Button>
+            <div className="pt-2">
+              <Button variant="primary" className="w-full gap-2" onClick={handleFinish}>
+                <span>Complete Order & Print Bill</span>
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         )}
       </ModalContent>

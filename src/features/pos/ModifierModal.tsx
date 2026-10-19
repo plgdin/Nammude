@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { MenuItem, MenuItemModifier } from '@/mocks/menu.data';
 import { Modal, ModalContent, ModalHeader, ModalTitle, ModalDescription, ModalFooter } from '@/components/ui/Modal';
 import { Button } from '@/components/ui/Button';
 import { formatCurrency } from '@/lib/currency';
+import { MenuItemWithModifiers, ModifierRecord, SelectedModifier } from './types';
 
 interface ModifierModalProps {
-  item: MenuItem | null;
+  item: MenuItemWithModifiers | null;
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (item: MenuItem, selectedModifiers: MenuItemModifier[], instructions: string) => void;
+  onConfirm: (item: MenuItemWithModifiers, selectedModifiers: SelectedModifier[], instructions: string) => void;
 }
 
 export const ModifierModal: React.FC<ModifierModalProps> = ({
@@ -17,31 +17,47 @@ export const ModifierModal: React.FC<ModifierModalProps> = ({
   onClose,
   onConfirm,
 }) => {
-  const [selectedModifiers, setSelectedModifiers] = useState<MenuItemModifier[]>([]);
+  const [selectedModifiers, setSelectedModifiers] = useState<SelectedModifier[]>([]);
   const [instructions, setInstructions] = useState('');
 
   if (!item) return null;
 
-  const handleToggleModifier = (modifier: MenuItemModifier, isRequiredGroup: boolean) => {
+  const handleToggleModifier = (modifier: ModifierRecord, isRequiredGroup: boolean) => {
     if (isRequiredGroup) {
       // Replace existing in group
       setSelectedModifiers((prev) => [
-        ...prev.filter((m) => !item.modifierGroups?.find((g) => g.required)?.options.some((o) => o.id === m.id)),
-        modifier,
+        ...prev.filter(
+          (m) =>
+            !item.modifier_groups
+              .find((g) => g.group.is_required)
+              ?.modifiers.some((o) => o.id === m.modifier_id)
+        ),
+        {
+          modifier_id: modifier.id,
+          name: modifier.name,
+          additional_price: modifier.additional_price,
+        },
       ]);
     } else {
       // Toggle
       setSelectedModifiers((prev) =>
-        prev.some((m) => m.id === modifier.id)
-          ? prev.filter((m) => m.id !== modifier.id)
-          : [...prev, modifier]
+        prev.some((m) => m.modifier_id === modifier.id)
+          ? prev.filter((m) => m.modifier_id !== modifier.id)
+          : [
+              ...prev,
+              {
+                modifier_id: modifier.id,
+                name: modifier.name,
+                additional_price: modifier.additional_price,
+              },
+            ]
       );
     }
   };
 
   const calculateTotal = () => {
-    const modTotal = selectedModifiers.reduce((acc, m) => acc + m.additionalPrice, 0);
-    return item.price + modTotal;
+    const modTotal = selectedModifiers.reduce((acc, m) => acc + m.additional_price, 0);
+    return item.base_price + modTotal;
   };
 
   const handleConfirm = () => {
@@ -60,25 +76,25 @@ export const ModifierModal: React.FC<ModifierModalProps> = ({
         </ModalHeader>
 
         <div className="space-y-4 py-2">
-          {item.modifierGroups?.map((group) => (
+          {item.modifier_groups?.map(({ group, modifiers }) => (
             <div key={group.id} className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-gray-300">
                   {group.name}
                 </span>
-                {group.required && (
+                {group.is_required && (
                   <span className="text-[10px] text-amber-400 font-medium">Required</span>
                 )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {group.options.map((opt) => {
-                  const isSelected = selectedModifiers.some((m) => m.id === opt.id);
+                {modifiers.map((opt) => {
+                  const isSelected = selectedModifiers.some((m) => m.modifier_id === opt.id);
                   return (
                     <button
                       key={opt.id}
                       type="button"
-                      onClick={() => handleToggleModifier(opt, group.required)}
+                      onClick={() => handleToggleModifier(opt, group.is_required)}
                       className={`flex items-center justify-between p-3 rounded-lg border text-xs font-medium transition-all min-h-[44px] ${
                         isSelected
                           ? 'border-brand bg-brand/15 text-white'
@@ -87,7 +103,7 @@ export const ModifierModal: React.FC<ModifierModalProps> = ({
                     >
                       <span>{opt.name}</span>
                       <span className="text-gray-400">
-                        {opt.additionalPrice > 0 ? `+${formatCurrency(opt.additionalPrice)}` : 'Free'}
+                        {opt.additional_price > 0 ? `+${formatCurrency(opt.additional_price)}` : 'Free'}
                       </span>
                     </button>
                   );

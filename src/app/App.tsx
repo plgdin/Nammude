@@ -21,9 +21,19 @@ const InventoryScreen = lazy(() =>
     default: m.InventoryScreen,
   }))
 );
+const KitchenScreen = lazy(() =>
+  import('@/features/kitchen/KitchenScreen').then((m) => ({
+    default: m.KitchenScreen,
+  }))
+);
 const LoginScreen = lazy(() =>
   import('@/features/auth/LoginScreen').then((m) => ({
     default: m.LoginScreen,
+  }))
+);
+const PublicMenuScreen = lazy(() =>
+  import('@/features/public-menu/PublicMenuScreen').then((m) => ({
+    default: m.PublicMenuScreen,
   }))
 );
 
@@ -43,6 +53,24 @@ export const App: React.FC = () => {
       <AuthProvider>
         <OrganizationProvider>
           <Routes>
+            {/* Public Digital Menu Routes (No Auth Required) */}
+            <Route
+              path="/menu"
+              element={
+                <Suspense fallback={<RouteLoadingFallback />}>
+                  <PublicMenuScreen />
+                </Suspense>
+              }
+            />
+            <Route
+              path="/menu/:slug"
+              element={
+                <Suspense fallback={<RouteLoadingFallback />}>
+                  <PublicMenuScreen />
+                </Suspense>
+              }
+            />
+
             {/* Public Auth Route */}
             <Route
               path="/login"
@@ -78,6 +106,15 @@ export const App: React.FC = () => {
                   </Suspense>
                 }
               />
+              <Route
+                path="/kitchen"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <KitchenScreen />
+                  </Suspense>
+                }
+              />
+              <Route path="/kds" element={<Navigate to="/kitchen" replace />} />
               <Route
                 path="/inventory"
                 element={
