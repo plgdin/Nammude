@@ -238,6 +238,32 @@ CREATE INDEX IF NOT EXISTS idx_grn_items_grn ON public.goods_receipt_items(goods
 -- 9. ROW-LEVEL SECURITY (RLS) POLICIES
 -- ==============================================================================
 
+-- ------------------------------------------------------------------------------
+-- Role & Permission Helper Functions
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.has_org_role(target_org_id UUID, required_role TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT CASE
+        WHEN required_role IN ('owner', 'manager') THEN public.is_org_owner_or_manager(target_org_id)
+        ELSE public.is_org_member(target_org_id)
+    END;
+$$;
+
+CREATE OR REPLACE FUNCTION public.has_branch_role(target_branch_id UUID, required_role TEXT)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+    SELECT public.has_branch_permission(target_branch_id);
+$$;
+
 ALTER TABLE public.suppliers ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.ingredients ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stock_locations ENABLE ROW LEVEL SECURITY;
