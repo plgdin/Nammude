@@ -279,3 +279,71 @@ INSERT INTO public.payments (
     'a2222222-2222-2222-2222-222222222222'
 ) ON CONFLICT (organization_id, idempotency_key) DO NOTHING;
 
+-- ------------------------------------------------------------------------------
+-- Phase 5 Seed Data: Suppliers, Locations, Ingredients, Recipes, Stocks & PO
+-- ------------------------------------------------------------------------------
+INSERT INTO public.suppliers (
+    id, organization_id, company_name, contact_person, phone, email, payment_terms_days
+) VALUES
+('s1111111-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Coastal Dairy Direct', 'Marcus Vance', '+1 (555) 392-1084', 'orders@coastaldairy.com', 30),
+('s1111111-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'Harbor Roasting Co.', 'Elena Rostova', '+1 (555) 489-3201', 'beans@harborroasting.com', 15),
+('s1111111-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'Valley Organic Produce', 'Carlos Mendez', '+1 (555) 781-9923', 'carlos@valleyorganic.com', 30),
+('s2222222-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'Metro Foodservice Corp', 'Janet Price', '+1 (555) 902-1144', 'sales@metrofood.com', 45)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.stock_locations (
+    id, organization_id, branch_id, name
+) VALUES
+('l1111111-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Main Walk-In Cooler'),
+('l1111111-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Bar Storage Dry Bin'),
+('l2222222-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', '22222222-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Kitchen Storage')
+ON CONFLICT (branch_id, name) DO NOTHING;
+
+INSERT INTO public.ingredients (
+    id, organization_id, name, sku, category, base_unit, purchase_unit, purchase_unit_factor, density_g_per_ml, reorder_level, ideal_stock, current_cost_price, preferred_supplier_id, is_perishable
+) VALUES
+('i1111111-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', 'Organic Whole Milk 3.8%', 'ING-DAI-01', 'Dairy & Milks', 'ml', 'L', 1000.0000, 1.0300, 25000.0000, 60000.0000, 0.0018, 's1111111-0000-0000-0000-000000000001', TRUE),
+('i1111111-0000-0000-0000-000000000002', '11111111-1111-1111-1111-111111111111', 'Oatly Barista Edition Oat Milk', 'ING-DAI-02', 'Dairy & Milks', 'ml', 'L', 1000.0000, 1.0200, 20000.0000, 50000.0000, 0.0029, 's1111111-0000-0000-0000-000000000001', TRUE),
+('i1111111-0000-0000-0000-000000000003', '11111111-1111-1111-1111-111111111111', 'Harbor House Espresso Beans', 'ING-COF-01', 'Coffee & Beans', 'g', 'kg', 1000.0000, NULL, 10000.0000, 25000.0000, 0.0225, 's1111111-0000-0000-0000-000000000002', FALSE),
+('i1111111-0000-0000-0000-000000000004', '11111111-1111-1111-1111-111111111111', 'Artisan Sourdough Loaves', 'ING-BAK-01', 'Dry Goods & Baking', 'pcs', 'pcs', 1.0000, NULL, 5.0000, 20.0000, 3.5000, 's1111111-0000-0000-0000-000000000003', TRUE),
+('i1111111-0000-0000-0000-000000000005', '11111111-1111-1111-1111-111111111111', 'Wild Forest Truffle Mushrooms', 'ING-PRO-01', 'Produce', 'g', 'kg', 1000.0000, NULL, 2000.0000, 8000.0000, 0.0150, 's1111111-0000-0000-0000-000000000003', TRUE),
+('i2222222-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'Bistro Espresso Beans', 'ING-BIS-01', 'Coffee & Beans', 'g', 'kg', 1000.0000, NULL, 8000.0000, 20000.0000, 0.0200, 's2222222-0000-0000-0000-000000000001', FALSE)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.branch_inventory_stocks (
+    organization_id, branch_id, ingredient_id, location_id, current_stock
+) VALUES
+('11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'i1111111-0000-0000-0000-000000000001', 'l1111111-0000-0000-0000-000000000001', 14500.0000), -- 14.5 L (low)
+('11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'i1111111-0000-0000-0000-000000000002', 'l1111111-0000-0000-0000-000000000001', 32000.0000), -- 32 L (ok)
+('11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'i1111111-0000-0000-0000-000000000003', 'l1111111-0000-0000-0000-000000000002', 6200.0000),  -- 6.2 kg (low)
+('11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'i1111111-0000-0000-0000-000000000004', 'l1111111-0000-0000-0000-000000000002', 12.0000),    -- 12 loaves
+('11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'i1111111-0000-0000-0000-000000000005', 'l1111111-0000-0000-0000-000000000001', 4500.0000)   -- 4.5 kg
+ON CONFLICT (branch_id, ingredient_id, location_id) DO NOTHING;
+
+-- Recipes (BOM)
+INSERT INTO public.recipes (
+    id, organization_id, menu_item_id, version, yield_servings, preparation_instructions
+) VALUES
+('r1111111-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '44444444-1111-0000-0000-000000000002', 1, 1.00, 'Double shot espresso extracted over steamed oat milk, microfoam silky texture')
+ON CONFLICT (organization_id, menu_item_id, version) DO NOTHING;
+
+INSERT INTO public.recipe_ingredients (
+    organization_id, recipe_id, ingredient_id, quantity, unit, wastage_percentage
+) VALUES
+('11111111-1111-1111-1111-111111111111', 'r1111111-0000-0000-0000-000000000001', 'i1111111-0000-0000-0000-000000000003', 18.0000, 'g', 3.00), -- 18g coffee beans + 3% grinder retention
+('11111111-1111-1111-1111-111111111111', 'r1111111-0000-0000-0000-000000000001', 'i1111111-0000-0000-0000-000000000002', 220.0000, 'ml', 5.00) -- 220ml oat milk + 5% pitcher residue
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.purchase_orders (
+    id, organization_id, branch_id, supplier_id, po_number, status, total_amount, expected_delivery_date
+) VALUES
+('po111111-0000-0000-0000-000000000001', '11111111-1111-1111-1111-111111111111', '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 's1111111-0000-0000-0000-000000000001', 'PO-2026-001', 'received', 92.5000, CURRENT_DATE)
+ON CONFLICT (branch_id, po_number) DO NOTHING;
+
+INSERT INTO public.purchase_order_items (
+    organization_id, purchase_order_id, ingredient_id, quantity, purchase_unit, conversion_factor, unit_price, total_price, received_quantity
+) VALUES
+('11111111-1111-1111-1111-111111111111', 'po111111-0000-0000-0000-000000000001', 'i1111111-0000-0000-0000-000000000001', 50.0000, 'L', 1000.0000, 1.8500, 92.5000, 50.0000)
+ON CONFLICT (id) DO NOTHING;
+
+

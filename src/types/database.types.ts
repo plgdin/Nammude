@@ -714,6 +714,488 @@ export interface Database {
           created_at?: string;
         };
       };
+      suppliers: {
+        Row: {
+          id: string;
+          organization_id: string;
+          company_name: string;
+          contact_person: string | null;
+          phone: string | null;
+          email: string | null;
+          tax_number: string | null;
+          payment_terms_days: number;
+          is_active: boolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          company_name: string;
+          contact_person?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          tax_number?: string | null;
+          payment_terms_days?: number;
+          is_active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          company_name?: string;
+          contact_person?: string | null;
+          phone?: string | null;
+          email?: string | null;
+          tax_number?: string | null;
+          payment_terms_days?: number;
+          is_active?: boolean;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      ingredients: {
+        Row: {
+          id: string;
+          organization_id: string;
+          name: string;
+          normalized_name: string;
+          sku: string | null;
+          category: string;
+          base_unit: string;
+          purchase_unit: string;
+          purchase_unit_factor: number;
+          density_g_per_ml: number | null;
+          reorder_level: number;
+          ideal_stock: number;
+          current_cost_price: number;
+          preferred_supplier_id: string | null;
+          is_perishable: boolean;
+          expiry_days: number | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          name: string;
+          sku?: string | null;
+          category?: string;
+          base_unit: string;
+          purchase_unit?: string;
+          purchase_unit_factor?: number;
+          density_g_per_ml?: number | null;
+          reorder_level?: number;
+          ideal_stock?: number;
+          current_cost_price?: number;
+          preferred_supplier_id?: string | null;
+          is_perishable?: boolean;
+          expiry_days?: number | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          name?: string;
+          sku?: string | null;
+          category?: string;
+          base_unit?: string;
+          purchase_unit?: string;
+          purchase_unit_factor?: number;
+          density_g_per_ml?: number | null;
+          reorder_level?: number;
+          ideal_stock?: number;
+          current_cost_price?: number;
+          preferred_supplier_id?: string | null;
+          is_perishable?: boolean;
+          expiry_days?: number | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      stock_locations: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          name: string;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          name: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          name?: string;
+          is_active?: boolean;
+          created_at?: string;
+        };
+      };
+      branch_inventory_stocks: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          ingredient_id: string;
+          location_id: string | null;
+          current_stock: number;
+          last_movement_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          ingredient_id: string;
+          location_id?: string | null;
+          current_stock?: number;
+          last_movement_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          ingredient_id?: string;
+          location_id?: string | null;
+          current_stock?: number;
+          last_movement_at?: string;
+          updated_at?: string;
+        };
+      };
+      recipes: {
+        Row: {
+          id: string;
+          organization_id: string;
+          menu_item_id: string;
+          version: number;
+          yield_servings: number;
+          preparation_instructions: string | null;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          menu_item_id: string;
+          version?: number;
+          yield_servings?: number;
+          preparation_instructions?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          menu_item_id?: string;
+          version?: number;
+          yield_servings?: number;
+          preparation_instructions?: string | null;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      recipe_ingredients: {
+        Row: {
+          id: string;
+          organization_id: string;
+          recipe_id: string;
+          ingredient_id: string;
+          quantity: number;
+          unit: string;
+          wastage_percentage: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          recipe_id: string;
+          ingredient_id: string;
+          quantity: number;
+          unit: string;
+          wastage_percentage?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          recipe_id?: string;
+          ingredient_id?: string;
+          quantity?: number;
+          unit?: string;
+          wastage_percentage?: number;
+          created_at?: string;
+        };
+      };
+      stock_movements: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          ingredient_id: string;
+          location_id: string | null;
+          movement_type: string;
+          quantity: number;
+          unit: string;
+          unit_cost: number;
+          total_cost: number;
+          resulting_stock: number | null;
+          reference_id: string | null;
+          reference_type: string | null;
+          idempotency_key: string | null;
+          reason: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          ingredient_id: string;
+          location_id?: string | null;
+          movement_type: string;
+          quantity: number;
+          unit: string;
+          unit_cost?: number;
+          total_cost?: number;
+          resulting_stock?: number | null;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          idempotency_key?: string | null;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          ingredient_id?: string;
+          location_id?: string | null;
+          movement_type?: string;
+          quantity?: number;
+          unit?: string;
+          unit_cost?: number;
+          total_cost?: number;
+          resulting_stock?: number | null;
+          reference_id?: string | null;
+          reference_type?: string | null;
+          idempotency_key?: string | null;
+          reason?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+        };
+      };
+      purchase_orders: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          supplier_id: string;
+          po_number: string;
+          status: string;
+          total_amount: number;
+          expected_delivery_date: string | null;
+          notes: string | null;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          supplier_id: string;
+          po_number: string;
+          status?: string;
+          total_amount?: number;
+          expected_delivery_date?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          supplier_id?: string;
+          po_number?: string;
+          status?: string;
+          total_amount?: number;
+          expected_delivery_date?: string | null;
+          notes?: string | null;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      purchase_order_items: {
+        Row: {
+          id: string;
+          organization_id: string;
+          purchase_order_id: string;
+          ingredient_id: string;
+          quantity: number;
+          purchase_unit: string;
+          conversion_factor: number;
+          unit_price: number;
+          total_price: number;
+          received_quantity: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          purchase_order_id: string;
+          ingredient_id: string;
+          quantity: number;
+          purchase_unit: string;
+          conversion_factor?: number;
+          unit_price: number;
+          total_price?: number;
+          received_quantity?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          purchase_order_id?: string;
+          ingredient_id?: string;
+          quantity?: number;
+          purchase_unit?: string;
+          conversion_factor?: number;
+          unit_price?: number;
+          total_price?: number;
+          received_quantity?: number;
+          created_at?: string;
+        };
+      };
+      goods_receipts: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          purchase_order_id: string | null;
+          supplier_id: string;
+          location_id: string | null;
+          grn_number: string;
+          invoice_number: string | null;
+          invoice_date: string | null;
+          total_amount: number;
+          status: string;
+          notes: string | null;
+          received_by: string | null;
+          idempotency_key: string | null;
+          received_at: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          purchase_order_id?: string | null;
+          supplier_id: string;
+          location_id?: string | null;
+          grn_number: string;
+          invoice_number?: string | null;
+          invoice_date?: string | null;
+          total_amount?: number;
+          status?: string;
+          notes?: string | null;
+          received_by?: string | null;
+          idempotency_key?: string | null;
+          received_at?: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          purchase_order_id?: string | null;
+          supplier_id?: string;
+          location_id?: string | null;
+          grn_number?: string;
+          invoice_number?: string | null;
+          invoice_date?: string | null;
+          total_amount?: number;
+          status?: string;
+          notes?: string | null;
+          received_by?: string | null;
+          idempotency_key?: string | null;
+          received_at?: string;
+          created_at?: string;
+        };
+      };
+      goods_receipt_items: {
+        Row: {
+          id: string;
+          organization_id: string;
+          goods_receipt_id: string;
+          ingredient_id: string;
+          received_quantity: number;
+          rejected_quantity: number;
+          purchase_unit: string;
+          conversion_factor: number;
+          normalized_quantity: number;
+          unit_cost: number;
+          total_cost: number;
+          batch_number: string | null;
+          expiry_date: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          goods_receipt_id: string;
+          ingredient_id: string;
+          received_quantity: number;
+          rejected_quantity?: number;
+          purchase_unit: string;
+          conversion_factor?: number;
+          normalized_quantity: number;
+          unit_cost: number;
+          total_cost?: number;
+          batch_number?: string | null;
+          expiry_date?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          goods_receipt_id?: string;
+          ingredient_id?: string;
+          received_quantity?: number;
+          rejected_quantity?: number;
+          purchase_unit?: string;
+          conversion_factor?: number;
+          normalized_quantity?: number;
+          unit_cost?: number;
+          total_cost?: number;
+          batch_number?: string | null;
+          expiry_date?: string | null;
+          created_at?: string;
+        };
+      };
     };
     Functions: {
       is_platform_admin: {
@@ -762,6 +1244,50 @@ export interface Database {
         };
         Returns: Json;
       };
+      consume_order_stock: {
+        Args: {
+          p_order_id: string;
+          p_idempotency_key?: string | null;
+        };
+        Returns: Json;
+      };
+      reverse_order_stock_consumption: {
+        Args: {
+          p_order_id: string;
+          p_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      process_goods_receipt: {
+        Args: {
+          p_organization_id: string;
+          p_branch_id: string;
+          p_supplier_id: string;
+          p_purchase_order_id: string | null;
+          p_location_id: string | null;
+          p_grn_number: string;
+          p_invoice_number: string | null;
+          p_invoice_date: string | null;
+          p_items: Json;
+          p_idempotency_key?: string | null;
+          p_notes?: string | null;
+        };
+        Returns: Json;
+      };
+      record_stock_adjustment: {
+        Args: {
+          p_organization_id: string;
+          p_branch_id: string;
+          p_ingredient_id: string;
+          p_location_id: string | null;
+          p_movement_type: string;
+          p_quantity_delta: number;
+          p_reason: string;
+          p_idempotency_key?: string | null;
+        };
+        Returns: Json;
+      };
     };
   };
 }
+

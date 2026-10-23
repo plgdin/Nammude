@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import { env } from '@/lib/env';
 import { roundMoney } from '@/lib/currency';
 import { CreateOrderPayload, OrderCreationResult, OrderRecord } from '../types';
+import { stockConsumptionService } from '@/features/inventory/services/stockConsumptionService';
 
 // In-memory mock store for developer evaluation and tests
 let mockOrdersStore: OrderRecord[] = [
@@ -145,6 +146,11 @@ export const orderService = {
     };
 
     mockOrdersStore.unshift(newOrder);
+
+    // Trigger ingredient stock consumption
+    stockConsumptionService.consumeOrderStock(orderId, payload.idempotency_key).catch((err) => {
+      console.warn('[orderService] Stock consumption trigger warning:', err);
+    });
 
     return {
       success: true,
