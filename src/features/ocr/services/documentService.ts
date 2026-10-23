@@ -197,6 +197,23 @@ export const documentService = {
       params.documentType
     );
 
+    // Real Supabase Storage upload attempt when connected
+    if (env.isConfigured && !env.isMockAuthEnabled && (params.file as any).rawFile) {
+      try {
+        const { error: storageErr } = await supabase.storage
+          .from('documents')
+          .upload(tenantScopedPath, (params.file as any).rawFile, {
+            contentType: params.file.type,
+            upsert: false,
+          });
+        if (storageErr) {
+          console.warn('[documentService] Storage upload warning:', storageErr.message);
+        }
+      } catch (sErr) {
+        console.warn('[documentService] Storage upload exception:', sErr);
+      }
+    }
+
     if (env.isConfigured && !env.isMockAuthEnabled) {
       try {
         const { data, error } = await (supabase.rpc as any)('ingest_document', {
@@ -383,6 +400,15 @@ export const documentService = {
     const doc = localDocuments.find((d) => d.id === params.documentId);
     if (!doc) throw new Error(`Document ${params.documentId} not found`);
 
+    // Gating legal state transitions: only documents in needs_review or queued can be decided
+    if (doc.status !== 'needs_review' && doc.status !== 'queued') {
+      throw new Error(`Document ${params.documentId} cannot be reviewed from its current state (${doc.status}).`);
+    }
+
+    if (params.action === 'reject' && (!params.rejectionReason || !params.rejectionReason.trim())) {
+      throw new Error('A valid rejection reason is mandatory when rejecting a document.');
+    }
+
     const ext = localExtractions.find((e) => e.document_id === params.documentId);
 
     if (params.action === 'verify') {
@@ -475,5 +501,24 @@ export const documentService = {
     doc.updated_at = new Date().toISOString();
 
     return { success: true, expenseId: expense.id };
+  },
+
+  /**
+   * Generates a signed, time-limited download URL for a document from private storage.
+   */
+  async getSecureDocumentUrl(filePath: string): Promise<string | null> {
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        const { data, error } = await supabase.storage
+          .from('documents')
+          .createSignedUrl(filePath, 3600); // 1-hour expiration
+        if (!error && data?.signedUrl) {
+          return data.signedUrl;
+        }
+      } catch (err) {
+        console.warn('[documentService] Failed to create signed storage URL:', err);
+      }
+    }
+    return `/documents/preview?path=${encodeURIComponent(filePath)}`;
   },
 };

@@ -4,6 +4,62 @@ import { FinancialReport } from '../types';
 
 export const financialReportService = {
   /**
+   * Corrected COGS Engine: Strictly deducts stock reversals for cancelled orders.
+   * Only returns attributable to order cancellations (reference_type = 'order_reversal')
+   * are subtracted from gross sale consumptions.
+   */
+  calculateRealizedCOGS(
+    movements: Array<{
+      movement_type: string;
+      reference_type?: string | null;
+      total_cost: number;
+    }>
+  ): number {
+    let cogs = 0.0;
+    for (const mov of movements) {
+      if (mov.movement_type === 'sale_consumption') {
+        cogs += mov.total_cost;
+      } else if (mov.movement_type === 'return' && mov.reference_type === 'order_reversal') {
+        cogs -= mov.total_cost;
+      }
+    }
+    return Math.max(0, Number(cogs.toFixed(2)));
+  },
+
+  /**
+   * Corrected Supplier AP Engine: Accumulates all eligible verified liabilities
+   * and disbursements up to the target end date (cumulative as of date),
+   * preventing prior-period liabilities from being discarded by report window start date.
+   */
+  calculateCumulativeSupplierAP(
+    receipts: Array<{ total_amount: number; status: string; received_at: string }>,
+    payments: Array<{ amount: number; payment_date: string }>,
+    asOfDate: string
+  ): {
+    cumulativeInvoiced: number;
+    cumulativePaid: number;
+    outstandingPayable: number;
+  } {
+    const endTarget = asOfDate.split('T')[0];
+
+    const cumInvoiced = receipts
+      .filter((r) => r.status === 'verified' && r.received_at.split('T')[0] <= endTarget)
+      .reduce((sum, r) => sum + r.total_amount, 0);
+
+    const cumPaid = payments
+      .filter((p) => p.payment_date.split('T')[0] <= endTarget)
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    const outstanding = Math.max(0, Number((cumInvoiced - cumPaid).toFixed(2)));
+
+    return {
+      cumulativeInvoiced: Number(cumInvoiced.toFixed(2)),
+      cumulativePaid: Number(cumPaid.toFixed(2)),
+      outstandingPayable: outstanding,
+    };
+  },
+
+  /**
    * Fetch comprehensive accrual and cash financial report
    */
   async getReport(params: {
@@ -100,8 +156,8 @@ export const financialReportService = {
         'Marketing & Local Ads': 270.0,
       },
       supplier_payables: {
-        total_invoiced: 4850.0, // From verified GRNs
-        total_paid: 3200.0,     // From recorded disbursements
+        total_invoiced: 4850.0, // Cumulative up to end date
+        total_paid: 3200.0,     // Cumulative up to end date
         outstanding_payable: 1650.0,
       },
     };

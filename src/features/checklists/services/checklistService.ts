@@ -161,7 +161,7 @@ let localInstances: ChecklistInstance[] = [
     template_id: 'tmpl-001',
     template_title: 'Morning FOH Opening & Register Preparation',
     category: 'opening',
-    scheduled_date: new Date().toISOString().split('T')[0],
+    scheduled_date: new Date(Date.now() - 86400000).toISOString().split('T')[0],
     shift_name: 'Morning Opening',
     status: 'completed',
     started_at: new Date(Date.now() - 3600000 * 5).toISOString(),
@@ -368,6 +368,21 @@ export const checklistService = {
     const tmpl = localTemplates.find((t) => t.id === params.templateId);
     if (!tmpl) throw new Error(`Template ${params.templateId} not found`);
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const targetShift = params.shiftName || 'Operational Shift';
+
+    // Idempotency: Return existing instance if already created today for branch + shift
+    const existing = localInstances.find(
+      (i) =>
+        i.branch_id === params.branchId &&
+        i.template_id === params.templateId &&
+        i.scheduled_date === todayStr &&
+        i.shift_name === targetShift
+    );
+    if (existing) {
+      return { success: true, instanceId: existing.id, instance: existing };
+    }
+
     const newInstanceId = `inst-${Date.now()}`;
     const instanceItems: ChecklistInstanceItem[] = (tmpl.items || []).map((ti, idx) => ({
       id: `inst-item-${Date.now()}-${idx}`,
@@ -390,8 +405,8 @@ export const checklistService = {
       template_id: tmpl.id,
       template_title: tmpl.title,
       category: tmpl.category,
-      scheduled_date: new Date().toISOString().split('T')[0],
-      shift_name: params.shiftName || 'Operational Shift',
+      scheduled_date: todayStr,
+      shift_name: targetShift,
       status: 'in_progress',
       started_at: new Date().toISOString(),
       completed_at: null,
@@ -471,13 +486,42 @@ export const checklistService = {
       throw new Error(`Checklist item ${params.itemId} not found`);
     }
 
+    // Completed checklist instances cannot be altered
+    if (targetInst.status === 'completed') {
+      throw new Error('Cannot modify items in a completed checklist instance.');
+    }
+
+    // Server-authoritative temperature validation
+    const tmpl = localTemplates.find((t) => t.id === targetInst!.template_id);
+    const tmplItem = tmpl?.items?.find((ti) => ti.id === targetItem!.template_item_id);
+
+    let isException = false;
+    let exceptionReason = params.exceptionReason || null;
+
+    if (tempVal !== undefined && tempVal !== null) {
+      if (tmplItem?.min_temperature !== null && tmplItem?.min_temperature !== undefined && tempVal < tmplItem.min_temperature) {
+        isException = true;
+        const breach = `Temperature ${tempVal}° is below minimum safe threshold (${tmplItem.min_temperature}°).`;
+        exceptionReason = params.exceptionReason ? `${params.exceptionReason} (${breach})` : breach;
+      } else if (tmplItem?.max_temperature !== null && tmplItem?.max_temperature !== undefined && tempVal > tmplItem.max_temperature) {
+        isException = true;
+        const breach = `Temperature ${tempVal}° exceeds maximum safe threshold (${tmplItem.max_temperature}°).`;
+        exceptionReason = params.exceptionReason ? `${params.exceptionReason} (${breach})` : breach;
+      }
+    }
+
+    if (params.isException && !isException) {
+      isException = true;
+      exceptionReason = params.exceptionReason || 'Manually flagged operational exception.';
+    }
+
     targetItem.is_completed = params.isCompleted;
     targetItem.completed_at = params.isCompleted ? new Date().toISOString() : null;
     targetItem.completed_by = params.userId || null;
     if (params.notes !== undefined) targetItem.notes = params.notes;
     if (tempVal !== undefined) targetItem.temperature_reading = tempVal;
-    if (params.isException !== undefined) targetItem.is_exception = params.isException;
-    if (params.exceptionReason !== undefined) targetItem.exception_reason = params.exceptionReason;
+    targetItem.is_exception = isException;
+    targetItem.exception_reason = exceptionReason;
 
     const completed = (targetInst.items || []).filter((i) => i.is_completed).length;
     const total = (targetInst.items || []).length;
