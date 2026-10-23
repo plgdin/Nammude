@@ -26,6 +26,11 @@ const KitchenScreen = lazy(() =>
     default: m.KitchenScreen,
   }))
 );
+const FinancialsScreen = lazy(() =>
+  import('@/features/financials/FinancialsScreen').then((m) => ({
+    default: m.FinancialsScreen,
+  }))
+);
 const LoginScreen = lazy(() =>
   import('@/features/auth/LoginScreen').then((m) => ({
     default: m.LoginScreen,
@@ -123,6 +128,15 @@ export const App: React.FC = () => {
                   </Suspense>
                 }
               />
+              <Route
+                path="/financials"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <FinancialsScreen />
+                  </Suspense>
+                }
+              />
+              <Route path="/reports" element={<Navigate to="/financials" replace />} />
             </Route>
 
             {/* Catch-all redirect */}

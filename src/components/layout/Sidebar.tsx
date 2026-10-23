@@ -31,10 +31,10 @@ export const Sidebar: React.FC = () => {
     { name: 'Point of Sale (POS)', path: '/pos', icon: UtensilsCrossed },
     { name: 'Kitchen KDS', path: '/kitchen', icon: CookingPot },
     { name: 'Inventory & Stock', path: '/inventory', icon: Boxes },
+    { name: 'Financials & Reports', path: '/financials', icon: ReceiptText },
   ];
 
   const futureRoutes = [
-    { name: 'Financial Ledger', icon: ReceiptText, phase: 'Phase 6' },
     { name: 'OCR Ingestion', icon: ScanText, phase: 'Phase 7' },
   ];
 

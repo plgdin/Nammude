@@ -1,13 +1,14 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, UtensilsCrossed, Boxes } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Boxes, ReceiptText } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 export const MobileNav: React.FC = () => {
   const routes = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'POS Register', path: '/pos', icon: UtensilsCrossed },
+    { name: 'POS', path: '/pos', icon: UtensilsCrossed },
     { name: 'Inventory', path: '/inventory', icon: Boxes },
+    { name: 'Financials', path: '/financials', icon: ReceiptText },
   ];
 
   return (

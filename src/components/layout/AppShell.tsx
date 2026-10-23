@@ -27,6 +27,12 @@ export const AppShell: React.FC = () => {
           title: 'Stock & Ingredients',
           subtitle: `${currentBranch?.name || 'Main Branch'} • Perpetual ingredient tracking`,
         };
+      case '/financials':
+      case '/reports':
+        return {
+          title: 'Financials & P&L',
+          subtitle: `${currentOrganization?.name || 'Restaurant'} • Operating income, cash reconciliation & costing`,
+        };
       default:
         return {
           title: currentOrganization?.name || 'Restaurant Platform',

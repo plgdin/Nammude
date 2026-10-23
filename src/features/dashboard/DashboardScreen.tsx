@@ -18,6 +18,7 @@ import {
   UtensilsCrossed,
   Boxes,
   Clock,
+  ReceiptText,
 } from 'lucide-react';
 
 export const DashboardScreen: React.FC = () => {
@@ -68,6 +69,14 @@ export const DashboardScreen: React.FC = () => {
           >
             <Boxes className="mr-2 h-4 w-4" />
             Stock ({lowStockItems.length})
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => navigate('/financials')}
+            className="flex-1 sm:flex-initial"
+          >
+            <ReceiptText className="mr-2 h-4 w-4" />
+            Financials
           </Button>
         </div>
       </div>
