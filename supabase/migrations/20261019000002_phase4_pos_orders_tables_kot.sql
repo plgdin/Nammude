@@ -447,7 +447,9 @@ BEGIN
         RAISE EXCEPTION 'Branch not found or inactive';
     END IF;
 
-    -- 4. Generate Daily Order Sequence Number (e.g. #101, #102)
+    -- 4. Generate Daily Order Sequence Number (Advisory transaction lock guarantees atomic concurrency per branch)
+    PERFORM pg_advisory_xact_lock(hashtext('branch_order_seq_' || p_branch_id::TEXT));
+
     SELECT COALESCE(COUNT(*), 0) + 101 INTO v_daily_seq
     FROM public.orders
     WHERE branch_id = p_branch_id AND created_at >= date_trunc('day', NOW());
