@@ -31,6 +31,16 @@ const FinancialsScreen = lazy(() =>
     default: m.FinancialsScreen,
   }))
 );
+const DocumentsScreen = lazy(() =>
+  import('@/features/ocr/DocumentsScreen').then((m) => ({
+    default: m.DocumentsScreen,
+  }))
+);
+const ChecklistsScreen = lazy(() =>
+  import('@/features/checklists/ChecklistsScreen').then((m) => ({
+    default: m.ChecklistsScreen,
+  }))
+);
 const LoginScreen = lazy(() =>
   import('@/features/auth/LoginScreen').then((m) => ({
     default: m.LoginScreen,
@@ -137,6 +147,23 @@ export const App: React.FC = () => {
                 }
               />
               <Route path="/reports" element={<Navigate to="/financials" replace />} />
+              <Route
+                path="/documents"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <DocumentsScreen />
+                  </Suspense>
+                }
+              />
+              <Route path="/ocr" element={<Navigate to="/documents" replace />} />
+              <Route
+                path="/checklists"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <ChecklistsScreen />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* Catch-all redirect */}

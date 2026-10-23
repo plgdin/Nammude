@@ -9,6 +9,7 @@ import {
   CookingPot,
   ReceiptText,
   ScanText,
+  ClipboardCheck,
   Coffee,
   ShieldCheck,
   Building2,
@@ -32,11 +33,11 @@ export const Sidebar: React.FC = () => {
     { name: 'Kitchen KDS', path: '/kitchen', icon: CookingPot },
     { name: 'Inventory & Stock', path: '/inventory', icon: Boxes },
     { name: 'Financials & Reports', path: '/financials', icon: ReceiptText },
+    { name: 'OCR Ingestion', path: '/documents', icon: ScanText },
+    { name: 'Staff Checklists', path: '/checklists', icon: ClipboardCheck },
   ];
 
-  const futureRoutes = [
-    { name: 'OCR Ingestion', icon: ScanText, phase: 'Phase 7' },
-  ];
+  const futureRoutes: Array<{ name: string; icon: any; phase: string }> = [];
 
   return (
     <aside className="hidden lg:flex w-64 flex-col border-r border-surface-border bg-surface select-none">

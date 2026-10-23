@@ -33,6 +33,17 @@ export const AppShell: React.FC = () => {
           title: 'Financials & P&L',
           subtitle: `${currentOrganization?.name || 'Restaurant'} • Operating income, cash reconciliation & costing`,
         };
+      case '/documents':
+      case '/ocr':
+        return {
+          title: 'OCR Ingestion',
+          subtitle: `${currentBranch?.name || 'Main Branch'} • Automated document extraction & human verification`,
+        };
+      case '/checklists':
+        return {
+          title: 'Staff Checklists',
+          subtitle: `${currentBranch?.name || 'Main Branch'} • Shift opening, food temperature & hygiene SOPs`,
+        };
       default:
         return {
           title: currentOrganization?.name || 'Restaurant Platform',

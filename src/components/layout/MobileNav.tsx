@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, UtensilsCrossed, Boxes, ReceiptText } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Boxes, ReceiptText, ClipboardCheck } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 export const MobileNav: React.FC = () => {
@@ -9,6 +9,7 @@ export const MobileNav: React.FC = () => {
     { name: 'POS', path: '/pos', icon: UtensilsCrossed },
     { name: 'Inventory', path: '/inventory', icon: Boxes },
     { name: 'Financials', path: '/financials', icon: ReceiptText },
+    { name: 'Tasks', path: '/checklists', icon: ClipboardCheck },
   ];
 
   return (

@@ -1443,6 +1443,285 @@ export interface Database {
           created_at?: string;
         };
       };
+      documents: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          document_type: 'supplier_invoice' | 'expense_receipt' | 'goods_receipt_support' | 'operational_doc';
+          file_name: string;
+          file_path: string;
+          file_size_bytes: number;
+          mime_type: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp';
+          file_hash: string | null;
+          status: 'uploaded' | 'queued' | 'processing' | 'needs_review' | 'verified' | 'rejected' | 'failed';
+          rejection_reason: string | null;
+          error_message: string | null;
+          uploaded_by: string | null;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          verified_at: string | null;
+          metadata: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          document_type: 'supplier_invoice' | 'expense_receipt' | 'goods_receipt_support' | 'operational_doc';
+          file_name: string;
+          file_path: string;
+          file_size_bytes: number;
+          mime_type: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp';
+          file_hash?: string | null;
+          status?: 'uploaded' | 'queued' | 'processing' | 'needs_review' | 'verified' | 'rejected' | 'failed';
+          rejection_reason?: string | null;
+          error_message?: string | null;
+          uploaded_by?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          verified_at?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          document_type?: 'supplier_invoice' | 'expense_receipt' | 'goods_receipt_support' | 'operational_doc';
+          file_name?: string;
+          file_path?: string;
+          file_size_bytes?: number;
+          mime_type?: 'application/pdf' | 'image/jpeg' | 'image/png' | 'image/webp';
+          file_hash?: string | null;
+          status?: 'uploaded' | 'queued' | 'processing' | 'needs_review' | 'verified' | 'rejected' | 'failed';
+          rejection_reason?: string | null;
+          error_message?: string | null;
+          uploaded_by?: string | null;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          verified_at?: string | null;
+          metadata?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      document_extractions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          document_id: string;
+          provider: string;
+          raw_text: string | null;
+          confidence_score: number | null;
+          extracted_data: Json;
+          corrected_data: Json | null;
+          matched_entity_type: 'supplier' | 'expense' | 'purchase_order' | 'goods_receipt' | null;
+          matched_entity_id: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          document_id: string;
+          provider?: string;
+          raw_text?: string | null;
+          confidence_score?: number | null;
+          extracted_data?: Json;
+          corrected_data?: Json | null;
+          matched_entity_type?: 'supplier' | 'expense' | 'purchase_order' | 'goods_receipt' | null;
+          matched_entity_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          document_id?: string;
+          provider?: string;
+          raw_text?: string | null;
+          confidence_score?: number | null;
+          extracted_data?: Json;
+          corrected_data?: Json | null;
+          matched_entity_type?: 'supplier' | 'expense' | 'purchase_order' | 'goods_receipt' | null;
+          matched_entity_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      checklist_templates: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string | null;
+          title: string;
+          description: string | null;
+          category: 'opening' | 'closing' | 'hygiene_cleaning' | 'equipment_maintenance' | 'food_temperature' | 'cash_handover' | 'stock_count';
+          assigned_role: string;
+          frequency: 'daily' | 'shift' | 'weekly' | 'adhoc';
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id?: string | null;
+          title: string;
+          description?: string | null;
+          category: 'opening' | 'closing' | 'hygiene_cleaning' | 'equipment_maintenance' | 'food_temperature' | 'cash_handover' | 'stock_count';
+          assigned_role?: string;
+          frequency?: 'daily' | 'shift' | 'weekly' | 'adhoc';
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string | null;
+          title?: string;
+          description?: string | null;
+          category?: 'opening' | 'closing' | 'hygiene_cleaning' | 'equipment_maintenance' | 'food_temperature' | 'cash_handover' | 'stock_count';
+          assigned_role?: string;
+          frequency?: 'daily' | 'shift' | 'weekly' | 'adhoc';
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      checklist_template_items: {
+        Row: {
+          id: string;
+          template_id: string;
+          item_order: number;
+          task_description: string;
+          is_required: boolean;
+          requires_notes: boolean;
+          requires_temperature_reading: boolean;
+          min_temperature: number | null;
+          max_temperature: number | null;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          item_order?: number;
+          task_description: string;
+          is_required?: boolean;
+          requires_notes?: boolean;
+          requires_temperature_reading?: boolean;
+          min_temperature?: number | null;
+          max_temperature?: number | null;
+        };
+        Update: {
+          id?: string;
+          template_id?: string;
+          item_order?: number;
+          task_description?: string;
+          is_required?: boolean;
+          requires_notes?: boolean;
+          requires_temperature_reading?: boolean;
+          min_temperature?: number | null;
+          max_temperature?: number | null;
+        };
+      };
+      checklist_instances: {
+        Row: {
+          id: string;
+          organization_id: string;
+          branch_id: string;
+          template_id: string;
+          scheduled_date: string;
+          shift_name: string;
+          status: 'in_progress' | 'completed' | 'flagged_exceptions';
+          started_at: string;
+          completed_at: string | null;
+          completed_by: string | null;
+          total_items: number;
+          completed_items: number;
+          exception_notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          branch_id: string;
+          template_id: string;
+          scheduled_date?: string;
+          shift_name?: string;
+          status?: 'in_progress' | 'completed' | 'flagged_exceptions';
+          started_at?: string;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          total_items?: number;
+          completed_items?: number;
+          exception_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          branch_id?: string;
+          template_id?: string;
+          scheduled_date?: string;
+          shift_name?: string;
+          status?: 'in_progress' | 'completed' | 'flagged_exceptions';
+          started_at?: string;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          total_items?: number;
+          completed_items?: number;
+          exception_notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      checklist_instance_items: {
+        Row: {
+          id: string;
+          instance_id: string;
+          template_item_id: string | null;
+          task_description: string;
+          is_completed: boolean;
+          completed_at: string | null;
+          completed_by: string | null;
+          notes: string | null;
+          temperature_reading: number | null;
+          is_exception: boolean;
+          exception_reason: string | null;
+        };
+        Insert: {
+          id?: string;
+          instance_id: string;
+          template_item_id?: string | null;
+          task_description: string;
+          is_completed?: boolean;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          notes?: string | null;
+          temperature_reading?: number | null;
+          is_exception?: boolean;
+          exception_reason?: string | null;
+        };
+        Update: {
+          id?: string;
+          instance_id?: string;
+          template_item_id?: string | null;
+          task_description?: string;
+          is_completed?: boolean;
+          completed_at?: string | null;
+          completed_by?: string | null;
+          notes?: string | null;
+          temperature_reading?: number | null;
+          is_exception?: boolean;
+          exception_reason?: string | null;
+        };
+      };
     };
     Functions: {
       is_platform_admin: {
@@ -1567,6 +1846,50 @@ export interface Database {
           p_branch_id?: string | null;
           p_start_date?: string;
           p_end_date?: string;
+        };
+        Returns: Json;
+      };
+      ingest_document: {
+        Args: {
+          p_organization_id: string;
+          p_branch_id: string;
+          p_document_type: string;
+          p_file_name: string;
+          p_file_path: string;
+          p_file_size_bytes: number;
+          p_mime_type: string;
+          p_file_hash?: string | null;
+          p_initial_extracted_data?: Json | null;
+          p_confidence_score?: number | null;
+        };
+        Returns: Json;
+      };
+      review_document: {
+        Args: {
+          p_document_id: string;
+          p_action: 'verify' | 'reject';
+          p_corrected_data?: Json | null;
+          p_rejection_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      instantiate_checklist: {
+        Args: {
+          p_organization_id: string;
+          p_branch_id: string;
+          p_template_id: string;
+          p_shift_name?: string;
+        };
+        Returns: Json;
+      };
+      toggle_checklist_item: {
+        Args: {
+          p_item_id: string;
+          p_is_completed: boolean;
+          p_notes?: string | null;
+          p_temperature?: number | null;
+          p_is_exception?: boolean;
+          p_exception_reason?: string | null;
         };
         Returns: Json;
       };
