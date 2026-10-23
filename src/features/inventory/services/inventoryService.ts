@@ -52,6 +52,16 @@ let localMovements: StockMovementRecord[] = mockStockMovements.map((mov) => ({
   created_at: mov.timestamp,
 }));
 
+const SEED_UUID_MAP: Record<string, string> = {
+  'i1111111-0000-0000-0000-000000000001': 'ing_whole_milk',
+  'i1111111-0000-0000-0000-000000000002': 'ing_oat_milk',
+  'i1111111-0000-0000-0000-000000000003': 'ing_espresso_beans',
+  'i1111111-0000-0000-0000-000000000004': 'ing_sourdough_bread',
+  'i1111111-0000-0000-0000-000000000005': 'ing_mushrooms',
+};
+
+const resolveIngId = (id?: string) => (id && SEED_UUID_MAP[id]) ? SEED_UUID_MAP[id] : id;
+
 export const inventoryService = {
   /**
    * Fetch all ingredients with current stock balances for a given branch
@@ -127,8 +137,9 @@ export const inventoryService = {
       }
     }
 
+    const targetId = resolveIngId(ingredientId);
     return localMovements.filter((m) =>
-      ingredientId ? m.ingredient_id === ingredientId : true
+      targetId ? (m.ingredient_id === targetId || m.ingredient_id === ingredientId) : true
     );
   },
 
@@ -171,7 +182,10 @@ export const inventoryService = {
     }
 
     // Local in-memory update
-    const ingIndex = localIngredients.findIndex((i) => i.id === params.ingredientId);
+    const resolvedId = resolveIngId(params.ingredientId);
+    const ingIndex = localIngredients.findIndex(
+      (i) => i.id === params.ingredientId || i.id === resolvedId
+    );
     let newStock = 0;
     if (ingIndex !== -1) {
       const current = localIngredients[ingIndex].current_stock ?? 0;

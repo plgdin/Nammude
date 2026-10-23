@@ -141,6 +141,7 @@ CREATE TABLE IF NOT EXISTS public.stock_movements (
     resulting_stock NUMERIC(14, 4),
     reference_id UUID, -- References orders(id), goods_receipts(id), etc.
     reference_type VARCHAR(32), -- 'order', 'goods_receipt', 'manual_adjustment', 'wastage'
+    recipe_id UUID REFERENCES public.recipes(id) ON DELETE SET NULL, -- Historical recipe snapshot linkage
     idempotency_key VARCHAR(64),
     reason TEXT,
     created_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -376,6 +377,7 @@ CREATE OR REPLACE FUNCTION public.record_stock_movement_internal(
     p_unit_cost NUMERIC(12, 4),
     p_reference_id UUID DEFAULT NULL,
     p_reference_type VARCHAR(32) DEFAULT NULL,
+    p_recipe_id UUID DEFAULT NULL,
     p_idempotency_key VARCHAR(64) DEFAULT NULL,
     p_reason TEXT DEFAULT NULL,
     p_actor_id UUID DEFAULT NULL
@@ -448,6 +450,7 @@ BEGIN
         resulting_stock,
         reference_id,
         reference_type,
+        recipe_id,
         idempotency_key,
         reason,
         created_by,
@@ -466,6 +469,7 @@ BEGIN
         v_new_stock,
         p_reference_id,
         p_reference_type,
+        p_recipe_id,
         p_idempotency_key,
         p_reason,
         p_actor_id,
@@ -476,6 +480,7 @@ BEGIN
     RETURN v_movement_id;
 END;
 $$;
+
 
 -- ------------------------------------------------------------------------------
 -- B. Order Ingredient Stock Consumption Procedure (Triggered on Order Confirmation)
@@ -500,6 +505,9 @@ DECLARE
     v_idem_key VARCHAR(64);
     v_user_id UUID;
 BEGIN
+    -- Advisory lock to guarantee atomic concurrency per order
+    PERFORM pg_advisory_xact_lock(hashtext('order_stock_cons_' || p_order_id::TEXT));
+
     v_user_id := auth.uid();
 
     -- 1. Fetch Order Details
@@ -570,7 +578,7 @@ BEGIN
 
                 v_idem_key := COALESCE(p_idempotency_key, 'ord_cons_' || p_order_id::TEXT) || '_' || v_item.id::TEXT || '_' || v_ing.ingredient_id::TEXT;
 
-                -- Record stock deduction (negative quantity)
+                -- Record stock deduction (negative quantity) linking exact recipe version
                 PERFORM public.record_stock_movement_internal(
                     p_organization_id => v_order.organization_id,
                     p_branch_id       => v_order.branch_id,
@@ -582,6 +590,7 @@ BEGIN
                     p_unit_cost       => v_ing.current_cost_price,
                     p_reference_id    => p_order_id,
                     p_reference_type  => 'order',
+                    p_recipe_id       => v_recipe.id,
                     p_idempotency_key => v_idem_key,
                     p_reason          => 'POS Sale: Order ' || v_order.order_number || ' (' || v_item.item_name || ' x' || v_item.quantity::TEXT || ')',
                     p_actor_id        => v_user_id
@@ -600,6 +609,7 @@ BEGIN
     );
 END;
 $$;
+
 
 -- ------------------------------------------------------------------------------
 -- C. Reverse Stock Consumption (On Order Cancellation / Void)
@@ -620,6 +630,9 @@ DECLARE
     v_user_id UUID;
     v_reversal_key VARCHAR(64);
 BEGIN
+    -- Advisory lock to serialize order reversal
+    PERFORM pg_advisory_xact_lock(hashtext('order_stock_rev_' || p_order_id::TEXT));
+
     v_user_id := auth.uid();
 
     SELECT * INTO v_order FROM public.orders WHERE id = p_order_id;
@@ -962,6 +975,11 @@ SECURITY DEFINER
 SET search_path = public, pg_temp
 AS $$
 BEGIN
+    -- Prohibit resurrecting or re-opening a cancelled order (clean immutable lifecycle)
+    IF TG_OP = 'UPDATE' AND OLD.status = 'cancelled' AND NEW.status != 'cancelled' THEN
+        RAISE EXCEPTION 'Invalid state transition: Cancelled order % cannot be reopened. Create a new order.', NEW.id;
+    END IF;
+
     -- On Order Confirmation: Deduct ingredient stock according to active recipes
     IF NEW.status = 'confirmed' AND (TG_OP = 'INSERT' OR OLD.status != 'confirmed') THEN
         PERFORM public.consume_order_stock(NEW.id, NEW.idempotency_key);
@@ -978,4 +996,90 @@ CREATE TRIGGER trg_order_stock_lifecycle_hook
 AFTER INSERT OR UPDATE OF status ON public.orders
 FOR EACH ROW
 EXECUTE FUNCTION public.trg_order_stock_lifecycle();
+
+-- ------------------------------------------------------------------------------
+-- G. Protect Confirmed Order Items From Post-Consumption Alterations
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.trg_protect_confirmed_order_items()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_order_status VARCHAR(32);
+BEGIN
+    SELECT status INTO v_order_status
+    FROM public.orders
+    WHERE id = COALESCE(OLD.order_id, NEW.order_id);
+
+    IF v_order_status IN ('confirmed', 'in_prep', 'ready', 'served', 'completed') THEN
+        RAISE EXCEPTION 'Cannot edit or delete line items of an active or completed order (Order status: %). Cancel or void order first.', v_order_status;
+    END IF;
+
+    RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_protect_order_items_lock ON public.order_items;
+CREATE TRIGGER trg_protect_order_items_lock
+BEFORE UPDATE OR DELETE ON public.order_items
+FOR EACH ROW
+EXECUTE FUNCTION public.trg_protect_confirmed_order_items();
+
+-- ------------------------------------------------------------------------------
+-- H. Branch Inventory Reconciliation RPC
+-- ------------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.reconcile_branch_stock(
+    p_branch_id UUID,
+    p_ingredient_id UUID
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+    v_user_id UUID;
+    v_cached_stock NUMERIC(14, 4);
+    v_ledger_stock NUMERIC(14, 4);
+    v_variance NUMERIC(14, 4);
+BEGIN
+    v_user_id := auth.uid();
+    IF v_user_id IS NOT NULL AND NOT public.has_branch_role(p_branch_id, 'manager') THEN
+        RAISE EXCEPTION 'Access denied. Manager role required for stock reconciliation.';
+    END IF;
+
+    -- Calculate cached balance sum
+    SELECT COALESCE(SUM(current_stock), 0.0000) INTO v_cached_stock
+    FROM public.branch_inventory_stocks
+    WHERE branch_id = p_branch_id AND ingredient_id = p_ingredient_id;
+
+    -- Calculate perpetual movement ledger sum
+    SELECT COALESCE(SUM(quantity), 0.0000) INTO v_ledger_stock
+    FROM public.stock_movements
+    WHERE branch_id = p_branch_id AND ingredient_id = p_ingredient_id;
+
+    v_variance := ROUND(v_cached_stock - v_ledger_stock, 4);
+
+    RETURN jsonb_build_object(
+        'branch_id', p_branch_id,
+        'ingredient_id', p_ingredient_id,
+        'cached_stock', v_cached_stock,
+        'ledger_stock', v_ledger_stock,
+        'variance', v_variance,
+        'is_reconciled', (v_variance = 0.0000)
+    );
+END;
+$$;
+
+-- ------------------------------------------------------------------------------
+-- I. Execution Grants
+-- ------------------------------------------------------------------------------
+GRANT EXECUTE ON FUNCTION public.consume_order_stock TO authenticated, anon;
+GRANT EXECUTE ON FUNCTION public.reverse_order_stock_consumption TO authenticated;
+GRANT EXECUTE ON FUNCTION public.process_goods_receipt TO authenticated;
+GRANT EXECUTE ON FUNCTION public.record_stock_adjustment TO authenticated;
+GRANT EXECUTE ON FUNCTION public.reconcile_branch_stock TO authenticated;
+
 
