@@ -894,9 +894,6 @@ BEGIN
             file_size_limit = 10485760,
             allowed_mime_types = ARRAY['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
-        -- Enable RLS on storage.objects
-        ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
-
         -- Drop old policies on documents bucket if any
         DROP POLICY IF EXISTS "Documents Bucket: branch staff can read" ON storage.objects;
         DROP POLICY IF EXISTS "Documents Bucket: branch staff can upload" ON storage.objects;
@@ -906,11 +903,10 @@ BEGIN
             ON storage.objects FOR SELECT
             USING (
                 bucket_id = 'documents'
-                AND (
-                    SELECT public.has_branch_role(
-                        (SUBSTRING(name FROM 'branch_([0-9a-fA-F-]+)'))::UUID,
-                        'cashier'
-                    )
+                AND name ~ '^org_[0-9a-fA-F-]+/branch_[0-9a-fA-F-]+/'
+                AND public.has_branch_role(
+                    (SUBSTRING(name FROM 'branch_([0-9a-fA-F-]+)'))::UUID,
+                    'cashier'
                 )
             );
 
@@ -919,11 +915,10 @@ BEGIN
             ON storage.objects FOR INSERT
             WITH CHECK (
                 bucket_id = 'documents'
-                AND (
-                    SELECT public.has_branch_role(
-                        (SUBSTRING(name FROM 'branch_([0-9a-fA-F-]+)'))::UUID,
-                        'cashier'
-                    )
+                AND name ~ '^org_[0-9a-fA-F-]+/branch_[0-9a-fA-F-]+/'
+                AND public.has_branch_role(
+                    (SUBSTRING(name FROM 'branch_([0-9a-fA-F-]+)'))::UUID,
+                    'cashier'
                 )
             );
     END IF;
