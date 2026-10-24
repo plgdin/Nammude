@@ -14,6 +14,8 @@ import {
   ShieldCheck,
   Building2,
   ChevronDown,
+  Users,
+  Compass,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
@@ -35,6 +37,9 @@ export const Sidebar: React.FC = () => {
     { name: 'Financials & Reports', path: '/financials', icon: ReceiptText },
     { name: 'OCR Ingestion', path: '/documents', icon: ScanText },
     { name: 'Staff Checklists', path: '/checklists', icon: ClipboardCheck },
+    { name: 'Customer CRM', path: '/customers', icon: Users },
+    { name: 'Restaurant Setup', path: '/onboarding', icon: Compass },
+    { name: 'Platform Admin', path: '/platform-admin', icon: ShieldCheck },
   ];
 
   const futureRoutes: Array<{ name: string; icon: any; phase: string }> = [];

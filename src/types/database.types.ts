@@ -495,6 +495,10 @@ export interface Database {
           total_amount: number;
           paid_amount: number;
           cashier_user_id: string | null;
+          customer_id: string | null;
+          loyalty_points_earned: number;
+          loyalty_points_redeemed: number;
+          loyalty_discount_amount: number;
           notes: string | null;
           idempotency_key: string | null;
           created_at: string;
@@ -518,6 +522,10 @@ export interface Database {
           total_amount?: number;
           paid_amount?: number;
           cashier_user_id?: string | null;
+          customer_id?: string | null;
+          loyalty_points_earned?: number;
+          loyalty_points_redeemed?: number;
+          loyalty_discount_amount?: number;
           notes?: string | null;
           idempotency_key?: string | null;
           created_at?: string;
@@ -541,6 +549,10 @@ export interface Database {
           total_amount?: number;
           paid_amount?: number;
           cashier_user_id?: string | null;
+          customer_id?: string | null;
+          loyalty_points_earned?: number;
+          loyalty_points_redeemed?: number;
+          loyalty_discount_amount?: number;
           notes?: string | null;
           idempotency_key?: string | null;
           created_at?: string;
@@ -1722,6 +1734,319 @@ export interface Database {
           exception_reason?: string | null;
         };
       };
+      subscription_plans: {
+        Row: {
+          id: string;
+          slug: string;
+          name: string;
+          description: string | null;
+          price_monthly: number;
+          price_annual: number;
+          max_branches: number;
+          max_staff: number;
+          allowed_modules: Json;
+          feature_flags: Json;
+          trial_period_days: number;
+          is_active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          name: string;
+          description?: string | null;
+          price_monthly?: number;
+          price_annual?: number;
+          max_branches?: number;
+          max_staff?: number;
+          allowed_modules?: Json;
+          feature_flags?: Json;
+          trial_period_days?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          name?: string;
+          description?: string | null;
+          price_monthly?: number;
+          price_annual?: number;
+          max_branches?: number;
+          max_staff?: number;
+          allowed_modules?: Json;
+          feature_flags?: Json;
+          trial_period_days?: number;
+          is_active?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      organization_subscriptions: {
+        Row: {
+          id: string;
+          organization_id: string;
+          plan_id: string;
+          status: 'trial' | 'active' | 'past_due' | 'suspended' | 'cancelled' | 'expired';
+          billing_cycle: 'monthly' | 'annual';
+          current_period_start: string;
+          current_period_end: string;
+          trial_ends_at: string | null;
+          cancelled_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          plan_id: string;
+          status?: 'trial' | 'active' | 'past_due' | 'suspended' | 'cancelled' | 'expired';
+          billing_cycle?: 'monthly' | 'annual';
+          current_period_start?: string;
+          current_period_end?: string;
+          trial_ends_at?: string | null;
+          cancelled_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          plan_id?: string;
+          status?: 'trial' | 'active' | 'past_due' | 'suspended' | 'cancelled' | 'expired';
+          billing_cycle?: 'monthly' | 'annual';
+          current_period_start?: string;
+          current_period_end?: string;
+          trial_ends_at?: string | null;
+          cancelled_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      subscription_invoices: {
+        Row: {
+          id: string;
+          organization_id: string;
+          subscription_id: string;
+          invoice_number: string;
+          amount: number;
+          currency: string;
+          status: 'draft' | 'paid' | 'unpaid' | 'void';
+          period_start: string;
+          period_end: string;
+          paid_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          subscription_id: string;
+          invoice_number: string;
+          amount: number;
+          currency?: string;
+          status?: 'draft' | 'paid' | 'unpaid' | 'void';
+          period_start: string;
+          period_end: string;
+          paid_at?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          subscription_id?: string;
+          invoice_number?: string;
+          amount?: number;
+          currency?: string;
+          status?: 'draft' | 'paid' | 'unpaid' | 'void';
+          period_start?: string;
+          period_end?: string;
+          paid_at?: string | null;
+          created_at?: string;
+        };
+      };
+      platform_audit_logs: {
+        Row: {
+          id: string;
+          actor_id: string | null;
+          action: string;
+          target_org_id: string | null;
+          details: Json;
+          ip_address: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          actor_id?: string | null;
+          action: string;
+          target_org_id?: string | null;
+          details?: Json;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          actor_id?: string | null;
+          action?: string;
+          target_org_id?: string | null;
+          details?: Json;
+          ip_address?: string | null;
+          created_at?: string;
+        };
+      };
+      organization_onboarding: {
+        Row: {
+          id: string;
+          organization_id: string;
+          current_step: number;
+          completed_steps: number[];
+          is_completed: boolean;
+          step_data: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          current_step?: number;
+          completed_steps?: number[];
+          is_completed?: boolean;
+          step_data?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          current_step?: number;
+          completed_steps?: number[];
+          is_completed?: boolean;
+          step_data?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      customers: {
+        Row: {
+          id: string;
+          organization_id: string;
+          display_name: string;
+          email: string | null;
+          phone: string | null;
+          notes: string | null;
+          tags: Json;
+          total_orders_count: number;
+          total_spend_amount: number;
+          last_order_at: string | null;
+          loyalty_points_balance: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          display_name: string;
+          email?: string | null;
+          phone?: string | null;
+          notes?: string | null;
+          tags?: Json;
+          total_orders_count?: number;
+          total_spend_amount?: number;
+          last_order_at?: string | null;
+          loyalty_points_balance?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          display_name?: string;
+          email?: string | null;
+          phone?: string | null;
+          notes?: string | null;
+          tags?: Json;
+          total_orders_count?: number;
+          total_spend_amount?: number;
+          last_order_at?: string | null;
+          loyalty_points_balance?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      loyalty_configs: {
+        Row: {
+          id: string;
+          organization_id: string;
+          is_enabled: boolean;
+          points_per_currency_unit: number;
+          currency_value_per_point: number;
+          min_redemption_points: number;
+          max_redemption_percentage: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          organization_id: string;
+          is_enabled?: boolean;
+          points_per_currency_unit?: number;
+          currency_value_per_point?: number;
+          min_redemption_points?: number;
+          max_redemption_percentage?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          organization_id?: string;
+          is_enabled?: boolean;
+          points_per_currency_unit?: number;
+          currency_value_per_point?: number;
+          min_redemption_points?: number;
+          max_redemption_percentage?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
+      customer_loyalty_ledger: {
+        Row: {
+          id: string;
+          customer_id: string;
+          organization_id: string;
+          order_id: string | null;
+          entry_type: 'earn' | 'redeem' | 'reversal' | 'manual_adjustment';
+          points: number;
+          balance_after: number;
+          idempotency_key: string;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          customer_id: string;
+          organization_id: string;
+          order_id?: string | null;
+          entry_type: 'earn' | 'redeem' | 'reversal' | 'manual_adjustment';
+          points: number;
+          balance_after: number;
+          idempotency_key: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          customer_id?: string;
+          organization_id?: string;
+          order_id?: string | null;
+          entry_type?: 'earn' | 'redeem' | 'reversal' | 'manual_adjustment';
+          points?: number;
+          balance_after?: number;
+          idempotency_key?: string;
+          notes?: string | null;
+          created_at?: string;
+        };
+      };
     };
     Functions: {
       is_platform_admin: {
@@ -1890,6 +2215,72 @@ export interface Database {
           p_temperature?: number | null;
           p_is_exception?: boolean;
           p_exception_reason?: string | null;
+        };
+        Returns: Json;
+      };
+      get_platform_metrics: {
+        Args: Record<PropertyKey, never>;
+        Returns: Json;
+      };
+      admin_suspend_organization: {
+        Args: {
+          p_org_id: string;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
+      admin_reactivate_organization: {
+        Args: {
+          p_org_id: string;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
+      admin_change_subscription_plan: {
+        Args: {
+          p_org_id: string;
+          p_new_plan_id: string;
+          p_reason?: string;
+        };
+        Returns: Json;
+      };
+      check_organization_entitlement: {
+        Args: {
+          p_org_id: string;
+          p_feature_key: string;
+        };
+        Returns: boolean;
+      };
+      check_organization_branch_limit: {
+        Args: {
+          p_org_id: string;
+        };
+        Returns: boolean;
+      };
+      save_onboarding_step: {
+        Args: {
+          p_org_id: string;
+          p_step: number;
+          p_step_data: Json;
+          p_mark_completed?: boolean;
+        };
+        Returns: Json;
+      };
+      complete_organization_onboarding: {
+        Args: {
+          p_org_id: string;
+        };
+        Returns: Json;
+      };
+      record_loyalty_transaction: {
+        Args: {
+          p_customer_id: string;
+          p_org_id: string;
+          p_order_id?: string | null;
+          p_entry_type: 'earn' | 'redeem' | 'reversal' | 'manual_adjustment';
+          p_points: number;
+          p_idempotency_key: string;
+          p_notes?: string | null;
         };
         Returns: Json;
       };

@@ -41,6 +41,21 @@ const ChecklistsScreen = lazy(() =>
     default: m.ChecklistsScreen,
   }))
 );
+const PlatformAdminScreen = lazy(() =>
+  import('@/features/platform/PlatformAdminScreen').then((m) => ({
+    default: m.PlatformAdminScreen,
+  }))
+);
+const OnboardingScreen = lazy(() =>
+  import('@/features/onboarding/OnboardingScreen').then((m) => ({
+    default: m.OnboardingScreen,
+  }))
+);
+const CustomersScreen = lazy(() =>
+  import('@/features/crm/CustomersScreen').then((m) => ({
+    default: m.CustomersScreen,
+  }))
+);
 const LoginScreen = lazy(() =>
   import('@/features/auth/LoginScreen').then((m) => ({
     default: m.LoginScreen,
@@ -164,6 +179,31 @@ export const App: React.FC = () => {
                   </Suspense>
                 }
               />
+              <Route
+                path="/platform-admin"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <PlatformAdminScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/onboarding"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <OnboardingScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/customers"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <CustomersScreen />
+                  </Suspense>
+                }
+              />
+              <Route path="/crm" element={<Navigate to="/customers" replace />} />
             </Route>
 
             {/* Catch-all redirect */}
