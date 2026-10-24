@@ -156,24 +156,26 @@ export const subscriptionService = {
       return newSub;
     }
 
-    const { data, error } = await (supabase.from('organization_subscriptions') as any)
-      .upsert(
-        {
-          organization_id: orgId,
-          plan_id: planId,
-          status: 'active',
-          billing_cycle: billingCycle,
-          current_period_start: new Date().toISOString(),
-          current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'organization_id' }
-      )
-      .select()
-      .single();
+    const { error } = await (supabase.rpc as any)('request_subscription_plan_change', {
+      p_org_id: orgId,
+      p_new_plan_id: planId,
+      p_billing_cycle: billingCycle,
+    });
 
     if (error) throw error;
-    return { ...data, plan };
+    const current = await this.getCurrentSubscription(orgId);
+    return current || {
+      id: `sub-${orgId.slice(0, 8)}`,
+      organization_id: orgId,
+      plan_id: planId,
+      status: 'active',
+      billing_cycle: billingCycle,
+      current_period_start: new Date().toISOString(),
+      current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+      trial_ends_at: null,
+      cancelled_at: null,
+      plan,
+    };
   },
 
   async checkEntitlement(orgId: string, featureKey: string): Promise<boolean> {

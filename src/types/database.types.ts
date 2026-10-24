@@ -2284,6 +2284,15 @@ export interface Database {
         };
         Returns: Json;
       };
+      request_subscription_plan_change: {
+        Args: {
+          p_org_id: string;
+          p_new_plan_id: string;
+          p_billing_cycle?: 'monthly' | 'annual';
+          p_payment_reference?: string | null;
+        };
+        Returns: Json;
+      };
     };
   };
 }

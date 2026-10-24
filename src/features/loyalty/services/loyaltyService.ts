@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { env } from '@/lib/env';
 import { LoyaltyConfig, LoyaltyLedgerEntry } from '../types';
+import { crmService } from '@/features/crm/services/crmService';
 
 const isMock = (): boolean => !env.isConfigured || env.isMockAuthEnabled;
 
@@ -176,6 +177,17 @@ export const loyaltyService = {
     }
 
     if (isMock()) {
+      const customers = await crmService.getCustomers(orgId);
+      const customer = customers.find((c) => c.id === customerId);
+      const currentBalance = customer?.loyalty_points_balance || 0;
+      const newBalance = currentBalance + pointsToAward;
+
+      if (customer) {
+        await crmService.updateCustomer(orgId, customerId, {
+          loyalty_points_balance: newBalance,
+        });
+      }
+
       const entry: LoyaltyLedgerEntry = {
         id: `ledg-${Date.now()}`,
         customer_id: customerId,
@@ -183,13 +195,13 @@ export const loyaltyService = {
         order_id: orderId,
         entry_type: 'earn',
         points: pointsToAward,
-        balance_after: pointsToAward,
+        balance_after: newBalance,
         idempotency_key: idempotencyKey,
         notes: `Awarded for qualifying order: $${orderTotal.toFixed(2)}`,
         created_at: new Date().toISOString(),
       };
       mockLedger.unshift(entry);
-      return { success: true, points: pointsToAward, new_balance: pointsToAward };
+      return { success: true, points: pointsToAward, new_balance: newBalance };
     }
 
     const { data, error } = await (supabase.rpc as any)('record_loyalty_transaction', {
@@ -227,7 +239,34 @@ export const loyaltyService = {
 
     const discountAmount = pointsToRedeem * config.currency_value_per_point;
 
+    // Check duplicate idempotency
+    const existing = mockLedger.find(
+      (l) => l.organization_id === orgId && l.idempotency_key === idempotencyKey
+    );
+    if (existing) {
+      return {
+        success: true,
+        discount_amount: discountAmount,
+        new_balance: existing.balance_after,
+      };
+    }
+
     if (isMock()) {
+      const customers = await crmService.getCustomers(orgId);
+      const customer = customers.find((c) => c.id === customerId);
+      const currentBalance = customer?.loyalty_points_balance || 0;
+
+      if (currentBalance < pointsToRedeem) {
+        throw new Error('Insufficient loyalty points balance');
+      }
+
+      const newBalance = currentBalance - pointsToRedeem;
+      if (customer) {
+        await crmService.updateCustomer(orgId, customerId, {
+          loyalty_points_balance: newBalance,
+        });
+      }
+
       const entry: LoyaltyLedgerEntry = {
         id: `ledg-${Date.now()}`,
         customer_id: customerId,
@@ -235,13 +274,13 @@ export const loyaltyService = {
         order_id: orderId,
         entry_type: 'redeem',
         points: -pointsToRedeem,
-        balance_after: 0,
+        balance_after: newBalance,
         idempotency_key: idempotencyKey,
         notes: `Redeemed ${pointsToRedeem} points for $${discountAmount.toFixed(2)} discount`,
         created_at: new Date().toISOString(),
       };
       mockLedger.unshift(entry);
-      return { success: true, discount_amount: discountAmount, new_balance: 0 };
+      return { success: true, discount_amount: discountAmount, new_balance: newBalance };
     }
 
     const { data, error } = await (supabase.rpc as any)('record_loyalty_transaction', {
@@ -269,7 +308,29 @@ export const loyaltyService = {
     pointsToReverse: number,
     idempotencyKey: string
   ): Promise<{ success: boolean; new_balance: number }> {
+    // Check duplicate idempotency
+    const existing = mockLedger.find(
+      (l) => l.organization_id === orgId && l.idempotency_key === idempotencyKey
+    );
+    if (existing) {
+      return {
+        success: true,
+        new_balance: existing.balance_after,
+      };
+    }
+
     if (isMock()) {
+      const customers = await crmService.getCustomers(orgId);
+      const customer = customers.find((c) => c.id === customerId);
+      const currentBalance = customer?.loyalty_points_balance || 0;
+      const newBalance = Math.max(0, currentBalance - pointsToReverse);
+
+      if (customer) {
+        await crmService.updateCustomer(orgId, customerId, {
+          loyalty_points_balance: newBalance,
+        });
+      }
+
       const entry: LoyaltyLedgerEntry = {
         id: `ledg-${Date.now()}`,
         customer_id: customerId,
@@ -277,13 +338,13 @@ export const loyaltyService = {
         order_id: orderId,
         entry_type: 'reversal',
         points: -pointsToReverse,
-        balance_after: 0,
+        balance_after: newBalance,
         idempotency_key: idempotencyKey,
         notes: `Reversal of order ${orderId} points due to cancellation/refund`,
         created_at: new Date().toISOString(),
       };
       mockLedger.unshift(entry);
-      return { success: true, new_balance: 0 };
+      return { success: true, new_balance: newBalance };
     }
 
     const { data, error } = await (supabase.rpc as any)('record_loyalty_transaction', {
