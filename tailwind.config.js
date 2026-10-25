@@ -28,6 +28,8 @@ export default {
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
         mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
+        bebas: ['"Bebas Neue"', 'sans-serif'],
+        poppins: ['Poppins', 'sans-serif'],
       },
       minHeight: {
         touch: '48px',

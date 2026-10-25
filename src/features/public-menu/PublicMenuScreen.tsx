@@ -1,49 +1,82 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useParams } from 'react-router-dom';
 import { menuService } from '@/features/pos/services/menuService';
+import { orderService } from '@/features/pos/services/orderService';
 import { MenuCategoryRecord, MenuItemWithModifiers } from '@/features/pos/types';
-import { formatCurrency } from '@/lib/currency';
 import {
-  Utensils,
-  Search,
-  Coffee,
-  ShieldCheck,
-} from 'lucide-react';
+  CustomerCartItem,
+  OrderingScreenState,
+  OrderSubmissionStatus,
+} from './types';
+import { WelcomeView } from './components/WelcomeView';
+import { MenuView } from './components/MenuView';
+import { ItemDetailsModal } from './components/ItemDetailsModal';
+import { BasketView } from './components/BasketView';
+import { ReviewOrderView } from './components/ReviewOrderView';
+import { OrderConfirmationView } from './components/OrderConfirmationView';
 
 export const PublicMenuScreen: React.FC = () => {
   const [searchParams] = useSearchParams();
   const params = useParams();
 
-  // Tenant Resolution: from URL path slug or query param 'tenant'
+  // Tenant & Table Resolution
   const tenantSlug = params.slug || searchParams.get('tenant') || 'harbor-cafe';
-  const tableParam = searchParams.get('table');
+  const tableNumber = searchParams.get('table') || '12';
 
+  const isHarbor = tenantSlug.toLowerCase().includes('harbor');
+  const orgId = isHarbor
+    ? '11111111-1111-1111-1111-111111111111'
+    : '22222222-2222-2222-2222-222222222222';
+  const branchId = isHarbor
+    ? '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
+    : '22222222-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const restaurantName = isHarbor ? 'Harbor Café' : 'Marian Bistro';
+
+  // Navigation State
+  // If user arrives via direct link or QR code, start at welcome or menu
+  const [currentScreen, setCurrentScreen] = useState<OrderingScreenState>('welcome');
+  const [selectedItemForDetails, setSelectedItemForDetails] = useState<MenuItemWithModifiers | null>(null);
+
+  // Menu Data State
   const [categories, setCategories] = useState<MenuCategoryRecord[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItemWithModifiers[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Tenant mock metadata for branding header
-  const isHarbor = tenantSlug.toLowerCase().includes('harbor');
-  const restaurantName = isHarbor ? 'Harbor Café' : 'Marian Bistro';
-  const restaurantTagline = isHarbor
-    ? 'Specialty Coffee, Fresh Bakery & Sourdough Melts'
-    : 'Classic French Bistro & Steak Frites';
+  // Cart State with Session Storage persistence
+  const [cartItems, setCartItems] = useState<CustomerCartItem[]>(() => {
+    try {
+      const saved = sessionStorage.getItem(`tablewise_cart_${orgId}_${tableNumber}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
 
+  // Order Submission State
+  const [submissionStatus, setSubmissionStatus] = useState<OrderSubmissionStatus>('idle');
+  const [placedOrderNumber, setPlacedOrderNumber] = useState<string>('0128');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  // Persist cart to session storage
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(`tablewise_cart_${orgId}_${tableNumber}`, JSON.stringify(cartItems));
+    } catch (err) {
+      console.warn('[Tablewise] Failed to persist cart to storage:', err);
+    }
+  }, [cartItems, orgId, tableNumber]);
+
+  // Load Catalog
   useEffect(() => {
     let isMounted = true;
-    async function loadPublicCatalog() {
+    async function loadCatalog() {
       setIsLoading(true);
-      // Public query passes tenant org id
-      const orgId = isHarbor
-        ? '11111111-1111-1111-1111-111111111111'
-        : '22222222-2222-2222-2222-222222222222';
-
       try {
         const [cats, items] = await Promise.all([
           menuService.getCategories(orgId),
-          menuService.getMenuItems(orgId, true), // only available items for public
+          menuService.getMenuItems(orgId, false), // Fetch all items to show availability statuses
         ]);
 
         if (isMounted) {
@@ -51,162 +84,255 @@ export const PublicMenuScreen: React.FC = () => {
           setMenuItems(items);
         }
       } catch (err) {
-        console.warn('[PublicMenu] Failed to load catalog:', err);
+        console.warn('[Tablewise] Failed to load menu catalog:', err);
       } finally {
         if (isMounted) setIsLoading(false);
       }
     }
 
-    loadPublicCatalog();
+    loadCatalog();
     return () => {
       isMounted = false;
     };
-  }, [tenantSlug]);
+  }, [orgId]);
 
-  const filteredItems = useMemo(() => {
-    return menuItems.filter((item) => {
-      const matchCat = selectedCategory === 'all' || item.category_id === selectedCategory;
-      const matchSearch =
-        searchQuery === '' ||
-        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase()));
-      return matchCat && matchSearch;
+  // Cart calculations
+  const cartTotal = useMemo(() => {
+    return cartItems.reduce((acc, item) => acc + item.lineTotal, 0);
+  }, [cartItems]);
+
+  const cartCount = useMemo(() => {
+    return cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  }, [cartItems]);
+
+  // Cart actions
+  const handleAddToCart = (newItem: CustomerCartItem) => {
+    setCartItems((prev) => {
+      // Check if identical item (same menuItem id, variant, addons, and instructions) exists
+      const existingIndex = prev.findIndex(
+        (i) =>
+          i.menuItem.id === newItem.menuItem.id &&
+          i.selectedVariant?.id === newItem.selectedVariant?.id &&
+          i.specialInstructions === newItem.specialInstructions &&
+          JSON.stringify(i.selectedAddons.map((a) => a.id).sort()) ===
+            JSON.stringify(newItem.selectedAddons.map((a) => a.id).sort())
+      );
+
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        const existing = updated[existingIndex];
+        const newQty = existing.quantity + newItem.quantity;
+        updated[existingIndex] = {
+          ...existing,
+          quantity: newQty,
+          lineTotal: existing.unitPrice * newQty,
+        };
+        return updated;
+      }
+
+      return [newItem, ...prev];
     });
-  }, [menuItems, selectedCategory, searchQuery]);
 
+    // Close details and return to menu
+    setSelectedItemForDetails(null);
+    setCurrentScreen('menu');
+  };
+
+  const handleUpdateQuantity = (cartItemId: string, newQty: number) => {
+    if (newQty <= 0) {
+      handleRemoveItem(cartItemId);
+      return;
+    }
+
+    setCartItems((prev) =>
+      prev.map((item) =>
+        item.id === cartItemId
+          ? {
+              ...item,
+              quantity: newQty,
+              lineTotal: item.unitPrice * newQty,
+            }
+          : item
+      )
+    );
+  };
+
+  const handleRemoveItem = (cartItemId: string) => {
+    setCartItems((prev) => prev.filter((item) => item.id !== cartItemId));
+  };
+
+  // Order Placement
+  const handlePlaceOrder = async () => {
+    if (cartItems.length === 0) return;
+
+    setSubmissionStatus('submitting');
+    setErrorMessage('');
+
+    const idempotencyKey = `tw-ord-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
+
+    try {
+      const payload = {
+        organization_id: orgId,
+        branch_id: branchId,
+        order_type: 'qr_self_order' as const,
+        table_id: null,
+        guest_count: 1,
+        notes: `Tablewise Dine-in Table ${tableNumber}`,
+        idempotency_key: idempotencyKey,
+        items: cartItems.map((ci) => ({
+          menu_item_id: ci.menuItem.id,
+          quantity: ci.quantity,
+          special_instructions: ci.specialInstructions || undefined,
+          selected_modifiers: [
+            ...(ci.selectedVariant
+              ? [
+                  {
+                    modifier_id: ci.selectedVariant.id,
+                    name: ci.selectedVariant.name,
+                    additional_price: ci.selectedVariant.additional_price,
+                  },
+                ]
+              : []),
+            ...ci.selectedAddons.map((addon) => ({
+              modifier_id: addon.id,
+              name: addon.name,
+              additional_price: addon.additional_price,
+            })),
+          ],
+        })),
+      };
+
+      const result = await orderService.createOrder(payload);
+
+      if (result.success) {
+        setPlacedOrderNumber(result.order_number.replace('#', '') || '0128');
+        setSubmissionStatus('success');
+        setCurrentScreen('confirmation');
+      } else {
+        setSubmissionStatus('failed');
+        setErrorMessage(result.error || "We couldn't place your order. No payment has been taken. Please try again.");
+      }
+    } catch (err: any) {
+      setSubmissionStatus('failed');
+      setErrorMessage(err.message || 'Order creation failed. Please try again.');
+    }
+  };
+
+  const handleResetAfterOrder = () => {
+    setCartItems([]);
+    try {
+      sessionStorage.removeItem(`tablewise_cart_${orgId}_${tableNumber}`);
+    } catch {}
+    setSubmissionStatus('idle');
+    setCurrentScreen('menu');
+  };
+
+  // Render current screen state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-[#2D2D2D] text-white flex flex-col items-center justify-center p-6 select-none font-poppins">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-[#2FDBBC] border-t-transparent rounded-full animate-spin" />
+          <span className="font-bebas text-xl tracking-wider uppercase text-white/80">
+            LOADING TABLEWISE MENU...
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // 1. Welcome Screen (Frame 01)
+  if (currentScreen === 'welcome') {
+    return (
+      <WelcomeView
+        restaurantName={restaurantName}
+        tableNumber={tableNumber}
+        onViewMenu={() => setCurrentScreen('menu')}
+      />
+    );
+  }
+
+  // 2. Item Details & Options Modal/View (Frame 03 & 03b)
+  if (currentScreen === 'item_details' && selectedItemForDetails) {
+    return (
+      <ItemDetailsModal
+        item={selectedItemForDetails}
+        restaurantName={restaurantName}
+        tableNumber={tableNumber}
+        onBack={() => {
+          setSelectedItemForDetails(null);
+          setCurrentScreen('menu');
+        }}
+        onAddToCart={handleAddToCart}
+      />
+    );
+  }
+
+  // 3. Basket View (Frame 04, 04b, 04c)
+  if (currentScreen === 'basket') {
+    return (
+      <BasketView
+        restaurantName={restaurantName}
+        tableNumber={tableNumber}
+        cartItems={cartItems}
+        onBackToMenu={() => setCurrentScreen('menu')}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        onProceedToReview={() => setCurrentScreen('review')}
+      />
+    );
+  }
+
+  // 4. Review & Payment View (Frame 05, 05b, 05c)
+  if (currentScreen === 'review') {
+    return (
+      <ReviewOrderView
+        restaurantName={restaurantName}
+        tableNumber={tableNumber}
+        cartItems={cartItems}
+        submissionStatus={submissionStatus}
+        errorMessage={errorMessage}
+        onBack={() => setCurrentScreen('basket')}
+        onPlaceOrder={handlePlaceOrder}
+      />
+    );
+  }
+
+  // 5. Order Confirmation & Kitchen Preparation View (Frame 06, 06b, 06c)
+  if (currentScreen === 'confirmation') {
+    return (
+      <OrderConfirmationView
+        restaurantName={restaurantName}
+        tableNumber={tableNumber}
+        orderNumber={placedOrderNumber}
+        cartItems={cartItems}
+        submissionStatus={submissionStatus}
+        errorMessage={errorMessage}
+        onReturnToMenu={handleResetAfterOrder}
+        onRetry={handlePlaceOrder}
+        onBackToBasket={() => setCurrentScreen('basket')}
+      />
+    );
+  }
+
+  // Default: Menu View (Frame 02)
   return (
-    <div className="min-h-screen bg-canvas text-canvas-fg flex flex-col font-sans select-none">
-      {/* Brand Header */}
-      <header className="border-b border-surface-border bg-surface px-4 py-6 sticky top-0 z-20 shadow-sm backdrop-blur-md">
-        <div className="max-w-3xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-brand text-brand-fg shadow-md">
-              <Coffee className="h-6 w-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-black text-white tracking-tight">{restaurantName}</h1>
-                {tableParam && (
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-brand/20 text-brand border border-brand/30">
-                    Table {tableParam}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-gray-400 mt-0.5">{restaurantTagline}</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px] text-gray-400 font-mono">
-            <div className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>Kitchen Open</span>
-            </div>
-            <span>•</span>
-            <span className="text-gray-400">Digital Menu</span>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="max-w-3xl mx-auto mt-4">
-          <div className="relative">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search dishes, drinks, ingredients..."
-              className="w-full rounded-2xl border border-surface-border bg-surface-elevated pl-10 pr-4 py-2.5 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
-            />
-          </div>
-        </div>
-
-        {/* Category Horizontal Filter */}
-        <div className="max-w-3xl mx-auto mt-3 flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('all')}
-            className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-              selectedCategory === 'all'
-                ? 'bg-brand text-brand-fg shadow'
-                : 'bg-surface-elevated text-gray-400 hover:text-white'
-            }`}
-          >
-            All Items
-          </button>
-          {categories.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => setSelectedCategory(c.id)}
-              className={`shrink-0 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                selectedCategory === c.id
-                  ? 'bg-brand text-brand-fg shadow'
-                  : 'bg-surface-elevated text-gray-400 hover:text-white'
-              }`}
-            >
-              {c.name}
-            </button>
-          ))}
-        </div>
-      </header>
-
-      {/* Main Menu Grid */}
-      <main className="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6">
-        {isLoading ? (
-          <div className="flex h-64 items-center justify-center text-xs text-gray-500">
-            <span>Loading published menu...</span>
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="flex h-64 flex-col items-center justify-center text-center text-gray-500">
-            <Utensils className="h-10 w-10 stroke-[1.5] mb-2" />
-            <p className="text-sm font-medium">No items found.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {filteredItems.map((item) => (
-              <div
-                key={item.id}
-                className="flex flex-col justify-between rounded-2xl border border-surface-border bg-surface-elevated p-4 transition-all hover:border-brand/40 shadow-sm"
-              >
-                <div>
-                  <div className="flex items-start justify-between gap-2">
-                    <h3 className="text-sm font-bold text-white">{item.name}</h3>
-                    <span className="text-sm font-bold text-brand font-mono shrink-0">
-                      {formatCurrency(item.base_price)}
-                    </span>
-                  </div>
-                  {item.description && (
-                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">
-                      {item.description}
-                    </p>
-                  )}
-                </div>
-
-                {/* Modifiers List (if any) */}
-                {item.modifier_groups && item.modifier_groups.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-surface-border/50 text-[11px] text-gray-400">
-                    <span className="font-semibold text-gray-300">Customizations: </span>
-                    <span>
-                      {item.modifier_groups
-                        .map((g) => g.modifiers.map((m) => m.name).join(', '))
-                        .join(' • ')}
-                    </span>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-surface-border bg-surface py-6 px-4 text-center text-xs text-gray-500">
-        <div className="flex items-center justify-center gap-1.5 mb-1 text-gray-400">
-          <ShieldCheck className="h-4 w-4 text-brand" />
-          <span className="font-bold">{restaurantName} Official Digital Menu</span>
-        </div>
-        <p className="text-[11px]">Powered by Restaurant SaaS OS • Direct live kitchen dispatch</p>
-      </footer>
-    </div>
+    <MenuView
+      restaurantName={restaurantName}
+      tableNumber={tableNumber}
+      categories={categories}
+      menuItems={menuItems}
+      selectedCategory={selectedCategory}
+      onSelectCategory={setSelectedCategory}
+      searchQuery={searchQuery}
+      onSearchChange={setSearchQuery}
+      onSelectItem={(item) => {
+        setSelectedItemForDetails(item);
+        setCurrentScreen('item_details');
+      }}
+      cartCount={cartCount}
+      cartTotal={cartTotal}
+      onOpenBasket={() => setCurrentScreen('basket')}
+    />
   );
 };
