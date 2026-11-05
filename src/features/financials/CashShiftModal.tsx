@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/Input';
 import { formatCurrency } from '@/lib/currency';
 import { cashShiftService } from './services/cashShiftService';
 import { CashShiftRecord, CashShiftMovementType } from './types';
-import { DollarSign, AlertCircle, ArrowDownRight, ArrowUpRight, CheckCircle2 } from 'lucide-react';
+import { IndianRupee, AlertCircle, ArrowDownRight, ArrowUpRight, CheckCircle2 } from 'lucide-react';
 
 interface CashShiftModalProps {
   isOpen: boolean;
@@ -257,7 +257,7 @@ export const CashShiftModal: React.FC<CashShiftModalProps> = ({
                         : 'bg-surface-elevated border-surface-border text-gray-400 hover:text-white'
                     }`}
                   >
-                    <DollarSign className="h-4 w-4" />
+                    <IndianRupee className="h-4 w-4" />
                     Petty Cash
                   </button>
                 </div>

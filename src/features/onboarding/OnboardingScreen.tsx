@@ -5,7 +5,7 @@ import {
   ArrowLeft,
   Building,
   Store,
-  DollarSign,
+  IndianRupee,
   UtensilsCrossed,
   Users,
   CreditCard,
@@ -20,7 +20,7 @@ const STEPS = [
   { id: 1, title: 'Identity', desc: 'Organization name & slug', icon: Building },
   { id: 2, title: 'Contact', desc: 'Business details & phone', icon: Store },
   { id: 3, title: 'Primary Branch', desc: 'Address & location', icon: Store },
-  { id: 4, title: 'Regional', desc: 'Currency & timezone', icon: DollarSign },
+  { id: 4, title: 'Regional', desc: 'Currency & timezone', icon: IndianRupee },
   { id: 5, title: 'Operations', desc: 'Order types & seating', icon: UtensilsCrossed },
   { id: 6, title: 'Menu Catalog', desc: 'Starter categories', icon: UtensilsCrossed },
   { id: 7, title: 'Staff Roles', desc: 'Invite key team members', icon: Users },
@@ -256,14 +256,14 @@ export const OnboardingScreen: React.FC = () => {
                 Currency
               </label>
               <select
-                value={formData.currency || 'USD'}
+                value={formData.currency || 'INR'}
                 onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
               >
+                <option value="INR">INR (₹) - Indian Rupee</option>
                 <option value="USD">USD ($)</option>
                 <option value="EUR">EUR (€)</option>
                 <option value="GBP">GBP (£)</option>
-                <option value="INR">INR (₹)</option>
                 <option value="CAD">CAD ($)</option>
               </select>
             </div>
@@ -375,9 +375,9 @@ export const OnboardingScreen: React.FC = () => {
           <div className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
-                { id: 'plan-starter', name: 'Starter', price: '$29/mo', desc: '1 branch, 5 staff' },
-                { id: 'plan-growth', name: 'Growth', price: '$79/mo', desc: '3 branches, 20 staff, CRM' },
-                { id: 'plan-pro', name: 'Professional', price: '$149/mo', desc: '10 branches, 50 staff, Full Suite' },
+                { id: 'plan-starter', name: 'Starter', price: '₹1,999/mo', desc: '1 branch, 5 staff' },
+                { id: 'plan-growth', name: 'Growth', price: '₹4,999/mo', desc: '3 branches, 20 staff, CRM' },
+                { id: 'plan-pro', name: 'Professional', price: '₹9,999/mo', desc: '10 branches, 50 staff, Full Suite' },
               ].map((p) => {
                 const selected = (formData.selected_plan_id || 'plan-pro') === p.id;
                 return (
@@ -414,7 +414,7 @@ export const OnboardingScreen: React.FC = () => {
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Currency & Timezone:</span>
-                <span className="font-semibold text-slate-200">{formData.currency || 'USD'} ({formData.timezone || 'UTC'})</span>
+                <span className="font-semibold text-slate-200">{formData.currency || 'INR'} ({formData.timezone || 'Asia/Kolkata'})</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-400">Selected Plan:</span>

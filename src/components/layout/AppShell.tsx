@@ -27,6 +27,12 @@ export const AppShell: React.FC = () => {
           title: 'Stock & Ingredients',
           subtitle: `${currentBranch?.name || 'Main Branch'} • Perpetual ingredient tracking`,
         };
+      case '/kitchen':
+      case '/kds':
+        return {
+          title: 'Kitchen Display',
+          subtitle: `${currentBranch?.name || 'Main Branch'} • KDS order queue & prep status`,
+        };
       case '/financials':
       case '/reports':
         return {
@@ -44,9 +50,30 @@ export const AppShell: React.FC = () => {
           title: 'Staff Checklists',
           subtitle: `${currentBranch?.name || 'Main Branch'} • Shift opening, food temperature & hygiene SOPs`,
         };
+      case '/customers':
+      case '/crm':
+        return {
+          title: 'Customer CRM',
+          subtitle: `${currentOrganization?.name || 'Restaurant'} • Customer profiles & loyalty`,
+        };
+      case '/onboarding':
+        return {
+          title: 'Restaurant Setup',
+          subtitle: `${currentOrganization?.name || 'Restaurant'} • Initial configuration wizard`,
+        };
+      case '/settings':
+        return {
+          title: 'Settings',
+          subtitle: `${currentOrganization?.name || 'Restaurant'} • Restaurant settings, staff & QR management`,
+        };
+      case '/platform-admin':
+        return {
+          title: 'Platform Administration',
+          subtitle: 'Tablewise • Cross-tenant governance & tenant management',
+        };
       default:
         return {
-          title: currentOrganization?.name || 'Restaurant Platform',
+          title: currentOrganization?.name || 'Tablewise Platform',
           subtitle: 'Operating System',
         };
     }

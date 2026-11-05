@@ -13,7 +13,7 @@ import { FinancialReport, ExpenseRecord, CashShiftRecord } from './types';
 import { ExpenseModal } from './ExpenseModal';
 import { CashShiftModal } from './CashShiftModal';
 import {
-  DollarSign,
+  IndianRupee,
   TrendingUp,
   CreditCard,
   Receipt,
@@ -189,7 +189,7 @@ export const FinancialsScreen: React.FC = () => {
           <Card className="p-4 bg-surface">
             <div className="flex items-center justify-between text-gray-400 text-xs">
               <span>Net Sales</span>
-              <DollarSign className="h-4 w-4 text-brand" />
+              <IndianRupee className="h-4 w-4 text-brand" />
             </div>
             <p className="text-xl sm:text-2xl font-bold text-white mt-1">
               {formatCurrency(report.revenue.net_sales)}
@@ -278,7 +278,7 @@ export const FinancialsScreen: React.FC = () => {
               : 'text-gray-400 hover:text-white hover:bg-surface-elevated'
           }`}
         >
-          <DollarSign className="h-4 w-4" />
+          <IndianRupee className="h-4 w-4" />
           Cash Drawer & Shift Reconciliation
         </button>
         <button

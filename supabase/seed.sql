@@ -49,6 +49,7 @@ INSERT INTO auth.users (
     phone_change,
     phone_change_token
 ) VALUES
+('00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'superadmin@tablewise.io', crypt('Admin123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Super Admin"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
 ('a1111111-1111-1111-1111-111111111111', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sarah.owner@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Sarah Jenkins"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
 ('a2222222-2222-2222-2222-222222222222', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'marco.cashier@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Marco Silva"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
 ('a3333333-3333-3333-3333-333333333333', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'elena.kitchen@harborcafe.com', crypt('Password123!', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{"full_name":"Elena Rostova"}'::jsonb, now(), now(), '', '', '', '', '', '', ''),
@@ -93,6 +94,7 @@ END $$;
 -- 2. Create Profiles for Test Users
 -- ------------------------------------------------------------------------------
 INSERT INTO public.profiles (id, email, full_name, phone, is_platform_admin) VALUES
+('00000000-0000-0000-0000-000000000001', 'superadmin@tablewise.io', 'Alan (SuperAdmin)', '+1 (555) 000-0001', TRUE),
 ('a1111111-1111-1111-1111-111111111111', 'sarah.owner@harborcafe.com', 'Sarah Jenkins', '+1 (555) 101-2001', FALSE),
 ('a2222222-2222-2222-2222-222222222222', 'marco.cashier@harborcafe.com', 'Marco Silva', '+1 (555) 101-2002', FALSE),
 ('a3333333-3333-3333-3333-333333333333', 'elena.kitchen@harborcafe.com', 'Elena Rostova', '+1 (555) 101-2003', FALSE),

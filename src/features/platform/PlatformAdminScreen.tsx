@@ -9,9 +9,12 @@ import {
   Search,
   Filter,
   CheckCircle,
+  Plus,
 } from 'lucide-react';
 import { platformAdminService } from './services/platformAdminService';
 import { PlatformMetrics, PlatformOrganization, PlatformAuditLog } from './types';
+import { CreateRestaurantModal } from './components/CreateRestaurantModal';
+import { formatCurrency } from '@/lib/currency';
 
 export const PlatformAdminScreen: React.FC = () => {
   const [metrics, setMetrics] = useState<PlatformMetrics | null>(null);
@@ -29,6 +32,7 @@ export const PlatformAdminScreen: React.FC = () => {
   const [selectedPlanId, setSelectedPlanId] = useState<string>('plan-pro');
   const [actionLoading, setActionLoading] = useState<boolean>(false);
   const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   const loadData = async () => {
     setLoading(true);
@@ -116,14 +120,23 @@ export const PlatformAdminScreen: React.FC = () => {
           </div>
         </div>
 
-        <button
-          onClick={loadData}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-medium transition text-sm disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          Refresh Metrics
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-medium transition text-sm shadow-lg shadow-indigo-600/30"
+          >
+            <Plus className="w-4 h-4" />
+            Add Restaurant
+          </button>
+          <button
+            onClick={loadData}
+            disabled={loading}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl font-medium transition text-sm disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh Metrics
+          </button>
+        </div>
       </div>
 
       {/* Notifications */}
@@ -180,7 +193,7 @@ export const PlatformAdminScreen: React.FC = () => {
             <TrendingUp className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-3xl font-extrabold text-emerald-400">
-            ${metrics ? metrics.verified_revenue_total.toLocaleString('en-US', { minimumFractionDigits: 2 }) : '0.00'}
+            {metrics ? formatCurrency(metrics.verified_revenue_total) : formatCurrency(0)}
           </div>
           <p className="mt-2 text-xs text-slate-400">From verified paid subscription invoices</p>
         </div>
@@ -407,10 +420,10 @@ export const PlatformAdminScreen: React.FC = () => {
                   onChange={(e) => setSelectedPlanId(e.target.value)}
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
                 >
-                  <option value="plan-starter">Starter ($29/mo)</option>
-                  <option value="plan-growth">Growth ($79/mo)</option>
-                  <option value="plan-pro">Professional ($149/mo)</option>
-                  <option value="plan-enterprise">Enterprise ($299/mo)</option>
+                  <option value="plan-starter">Starter (₹1,999/mo)</option>
+                  <option value="plan-growth">Growth (₹4,999/mo)</option>
+                  <option value="plan-pro">Professional (₹9,999/mo)</option>
+                  <option value="plan-enterprise">Enterprise (₹19,999/mo)</option>
                 </select>
               </div>
             ) : null}
@@ -450,6 +463,16 @@ export const PlatformAdminScreen: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Provision New Restaurant Modal */}
+      <CreateRestaurantModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSuccess={(orgName) => {
+          setNotification({ message: `Successfully provisioned ${orgName}`, type: 'success' });
+          loadData();
+        }}
+      />
     </div>
   );
 };

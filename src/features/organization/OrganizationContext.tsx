@@ -24,7 +24,7 @@ export interface OrganizationContextType {
 const OrganizationContext = createContext<OrganizationContextType | undefined>(undefined);
 
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isMockMode, isAuthenticated } = useAuth();
+  const { user, isMockMode, isAuthenticated, isPlatformAdmin } = useAuth();
 
   const [permittedOrganizations, setPermittedOrganizations] = useState<OrganizationRecord[]>([]);
   const [currentOrganization, setCurrentOrganization] = useState<OrganizationRecord | null>(null);
@@ -59,6 +59,38 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
     if (env.isConfigured && !isMockMode) {
       try {
+        if (isPlatformAdmin) {
+          // Platform admins see all active organizations in the database
+          const { data: allOrgs, error: orgErr } = await supabase
+            .from('organizations')
+            .select('*')
+            .eq('status', 'active');
+
+          if (orgErr) throw orgErr;
+
+          const orgList = (allOrgs || []) as unknown as OrganizationRecord[];
+          setPermittedOrganizations(orgList);
+          if (orgList.length > 0) {
+            const activeOrg = orgList[0];
+            setCurrentOrganization(activeOrg);
+            applyBranding(activeOrg);
+
+            const { data: branches } = await supabase
+              .from('branches')
+              .select('*')
+              .eq('organization_id', activeOrg.id)
+              .eq('status', 'active');
+
+            const branchList = (branches || []) as unknown as BranchRecord[];
+            setPermittedBranches(branchList);
+            if (branchList.length > 0) {
+              setCurrentBranch(branchList[0]);
+            }
+          }
+          setIsLoading(false);
+          return;
+        }
+
         // 1. Fetch memberships from Supabase
         const { data: memberships, error: memErr } = await supabase
           .from('memberships')
@@ -107,12 +139,19 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } else {
       // Mock / Dev Mode: Resolve from typed SEED data
       const seedUser = SEED_USERS.find((u) => u.id === user.id) || SEED_USERS[0];
-      const matchedOrg = SEED_ORGANIZATIONS.find((o) => o.id === seedUser.organizationId) || SEED_ORGANIZATIONS[0];
-      const matchedBranches = SEED_BRANCHES.filter((b) => b.organization_id === matchedOrg.id);
+      const isPlatformAdmin = seedUser.role === 'platform_admin' || (seedUser as any).isPlatformAdmin;
 
-      setPermittedOrganizations([matchedOrg]);
-      setCurrentOrganization(matchedOrg);
-      applyBranding(matchedOrg);
+      // Platform admins see ALL organizations; regular users see only theirs
+      const orgs = isPlatformAdmin
+        ? SEED_ORGANIZATIONS
+        : [SEED_ORGANIZATIONS.find((o) => o.id === seedUser.organizationId) || SEED_ORGANIZATIONS[0]];
+
+      const activeOrg = orgs[0];
+      const matchedBranches = SEED_BRANCHES.filter((b) => b.organization_id === activeOrg.id);
+
+      setPermittedOrganizations(orgs);
+      setCurrentOrganization(activeOrg);
+      applyBranding(activeOrg);
 
       setPermittedBranches(matchedBranches);
       if (matchedBranches.length > 0) {
@@ -121,7 +160,7 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       setCurrentMembership({
         id: `mem_${seedUser.id}`,
-        organization_id: matchedOrg.id,
+        organization_id: activeOrg.id,
         user_id: seedUser.id,
         role: seedUser.role,
         status: 'active',

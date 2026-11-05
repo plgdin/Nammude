@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 import { env } from '@/lib/env';
-import { Database } from '@/types/database.types';
+import { Database, MembershipRole } from '@/types/database.types';
 import { SEED_USERS, SeedUserFixture } from '@/mocks/auth.fixtures';
 
 export type UserProfile = Database['public']['Tables']['profiles']['Row'];
@@ -14,6 +14,8 @@ export interface AuthContextType {
   isLoading: boolean;
   isAuthenticated: boolean;
   isMockMode: boolean;
+  isPlatformAdmin: boolean;
+  activeRole: MembershipRole | null;
   error: string | null;
   signInWithPassword: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   signInWithMockUser: (mockUser: SeedUserFixture) => void;
@@ -30,6 +32,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isMockMode, setIsMockMode] = useState<boolean>(env.isMockAuthEnabled || !env.isConfigured);
+  const [activeRole, setActiveRole] = useState<MembershipRole | null>(null);
+
+  const isPlatformAdmin = profile?.is_platform_admin === true || activeRole === 'platform_admin';
 
   // Fetch or sync public profile
   const fetchProfile = useCallback(async (userId: string) => {
@@ -45,10 +50,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       if (data) {
-        setProfile(data);
+        const userProf = data as unknown as UserProfile;
+        setProfile(userProf);
+        if (userProf.is_platform_admin) {
+          setActiveRole('platform_admin');
+        }
       }
     } catch (err) {
       console.warn('[Auth] Unexpected error loading profile:', err);
+    }
+  }, []);
+
+  // Fetch active membership role for the user
+  const fetchActiveRole = useCallback(async (userId: string) => {
+    try {
+      const { data, error: roleErr } = await supabase
+        .from('memberships')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .limit(1)
+        .maybeSingle();
+
+      if (roleErr) {
+        console.warn('[Auth] Failed to load user role:', roleErr.message);
+        return;
+      }
+      if (data) {
+        const record = data as unknown as { role: MembershipRole };
+        if (record?.role) {
+          setActiveRole(record.role);
+        }
+      } else {
+        // If no restaurant membership, keep platform_admin if set
+        setActiveRole((prev) => (prev === 'platform_admin' ? 'platform_admin' : prev));
+      }
+    } catch (err) {
+      console.warn('[Auth] Unexpected error loading role:', err);
     }
   }, []);
 
@@ -70,33 +108,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setUser(currentSession.user);
             setIsMockMode(false);
             await fetchProfile(currentSession.user.id);
+            await fetchActiveRole(currentSession.user.id);
           }
         } catch (err) {
           console.warn('[Auth] Live session check error:', err);
         }
       } else if (env.isMockAuthEnabled) {
-        // Fallback to initial seed user (Sarah - Harbor Café Owner) for immediate developer evaluation
-        const initialSeed = SEED_USERS[0];
+        // Fallback to primary owner seed user for immediate developer evaluation
+        const initialSeed = SEED_USERS.find((u) => u.role === 'owner') || SEED_USERS[0];
         if (isMounted) {
-          setUser({
-            id: initialSeed.id,
-            email: initialSeed.email,
-            app_metadata: {},
-            user_metadata: { full_name: initialSeed.fullName },
-            aud: 'authenticated',
-            created_at: new Date().toISOString(),
-          } as User);
-          setProfile({
-            id: initialSeed.id,
-            email: initialSeed.email,
-            full_name: initialSeed.fullName,
-            avatar_url: null,
-            phone: null,
-            is_platform_admin: false,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-          setIsMockMode(true);
+          applyMockUser(initialSeed);
         }
       }
 
@@ -115,8 +136,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(newSession?.user || null);
         if (newSession?.user) {
           await fetchProfile(newSession.user.id);
+          await fetchActiveRole(newSession.user.id);
         } else {
           setProfile(null);
+          setActiveRole(null);
         }
         setIsLoading(false);
       });
@@ -130,7 +153,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       isMounted = false;
     };
-  }, [fetchProfile]);
+  }, [fetchProfile, fetchActiveRole]);
+
+  // Apply mock user state
+  const applyMockUser = (mockUser: SeedUserFixture) => {
+    setUser({
+      id: mockUser.id,
+      email: mockUser.email,
+      app_metadata: {},
+      user_metadata: { full_name: mockUser.fullName },
+      aud: 'authenticated',
+      created_at: new Date().toISOString(),
+    } as User);
+
+    setProfile({
+      id: mockUser.id,
+      email: mockUser.email,
+      full_name: mockUser.fullName,
+      avatar_url: null,
+      phone: null,
+      is_platform_admin: mockUser.isPlatformAdmin || false,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    setActiveRole(mockUser.role as MembershipRole);
+    setIsMockMode(true);
+  };
 
   // Sign In with email & password
   const signInWithPassword = async (email: string, password: string) => {
@@ -155,6 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(data.user);
           setIsMockMode(false);
           await fetchProfile(data.user.id);
+          await fetchActiveRole(data.user.id);
         }
 
         setIsLoading(false);
@@ -193,27 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sign In with Mock Seed User (Dev / Testing)
   const signInWithMockUser = (mockUser: SeedUserFixture) => {
-    setUser({
-      id: mockUser.id,
-      email: mockUser.email,
-      app_metadata: {},
-      user_metadata: { full_name: mockUser.fullName },
-      aud: 'authenticated',
-      created_at: new Date().toISOString(),
-    } as User);
-
-    setProfile({
-      id: mockUser.id,
-      email: mockUser.email,
-      full_name: mockUser.fullName,
-      avatar_url: null,
-      phone: null,
-      is_platform_admin: false,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    });
-
-    setIsMockMode(true);
+    applyMockUser(mockUser);
     setError(null);
   };
 
@@ -226,6 +256,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
     setProfile(null);
     setSession(null);
+    setActiveRole(null);
     setError(null);
     setIsLoading(false);
   };
@@ -239,6 +270,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading,
     isAuthenticated: user !== null,
     isMockMode,
+    isPlatformAdmin,
+    activeRole,
     error,
     signInWithPassword,
     signInWithMockUser,

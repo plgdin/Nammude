@@ -27,10 +27,10 @@ export const currentTenant: TenantConfig = {
   name: 'Harbor Café',
   slug: 'harbor-cafe',
   tagline: 'Artisan Coffee & Kitchen',
-  baseCurrency: 'USD',
-  currencySymbol: '$',
+  baseCurrency: 'INR',
+  currencySymbol: '₹',
   currencyDecimals: 2,
-  locale: 'en-US',
+  locale: 'en-IN',
   brandColor: '#2563eb',
   accentColor: '#f59e0b',
   branches: [

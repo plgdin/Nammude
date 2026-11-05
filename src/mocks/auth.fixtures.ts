@@ -9,9 +9,11 @@ export interface SeedUserFixture {
   organizationName: string;
   organizationSlug: string;
   branchIds: string[];
+  isPlatformAdmin?: boolean;
 }
 
 export const SEED_USERS: SeedUserFixture[] = [
+  // ── Harbor Café – Owner (index 0) ──
   {
     id: 'a1111111-1111-1111-1111-111111111111',
     email: 'sarah.owner@harborcafe.com',
@@ -22,6 +24,7 @@ export const SEED_USERS: SeedUserFixture[] = [
     organizationSlug: 'harbor-cafe',
     branchIds: ['11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa', '11111111-bbbb-bbbb-bbbb-bbbbbbbbbbbb'],
   },
+  // ── Harbor Café – Cashier (index 1) ──
   {
     id: 'a2222222-2222-2222-2222-222222222222',
     email: 'marco.cashier@harborcafe.com',
@@ -32,6 +35,7 @@ export const SEED_USERS: SeedUserFixture[] = [
     organizationSlug: 'harbor-cafe',
     branchIds: ['11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
   },
+  // ── Marian Bistro – Owner (index 2) ──
   {
     id: 'b1111111-1111-1111-1111-111111111111',
     email: 'marian.owner@marianbistro.com',
@@ -42,11 +46,57 @@ export const SEED_USERS: SeedUserFixture[] = [
     organizationSlug: 'marian-bistro',
     branchIds: ['22222222-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
   },
+  // ── Marian Bistro – Cashier (index 3) ──
   {
     id: 'b2222222-2222-2222-2222-222222222222',
     email: 'david.cashier@marianbistro.com',
     fullName: 'David Lopez',
     role: 'cashier',
+    organizationId: '22222222-2222-2222-2222-222222222222',
+    organizationName: 'Marian Bistro',
+    organizationSlug: 'marian-bistro',
+    branchIds: ['22222222-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+  },
+  // ── Platform SuperAdmin (index 4) ──
+  {
+    id: 'p0000000-0000-0000-0000-000000000000',
+    email: 'superadmin@tablewise.io',
+    fullName: 'Alan (SuperAdmin)',
+    role: 'platform_admin',
+    organizationId: '11111111-1111-1111-1111-111111111111',
+    organizationName: 'Tablewise Platform',
+    organizationSlug: 'tablewise-platform',
+    branchIds: [],
+    isPlatformAdmin: true,
+  },
+  // ── Harbor Café – Kitchen Staff ──
+  {
+    id: 'a3333333-3333-3333-3333-333333333333',
+    email: 'chef.raj@harborcafe.com',
+    fullName: 'Raj Patel',
+    role: 'kitchen',
+    organizationId: '11111111-1111-1111-1111-111111111111',
+    organizationName: 'Harbor Café',
+    organizationSlug: 'harbor-cafe',
+    branchIds: ['11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+  },
+  // ── Harbor Café – Inventory Staff ──
+  {
+    id: 'a4444444-4444-4444-4444-444444444444',
+    email: 'nisha.inventory@harborcafe.com',
+    fullName: 'Nisha Mehra',
+    role: 'inventory',
+    organizationId: '11111111-1111-1111-1111-111111111111',
+    organizationName: 'Harbor Café',
+    organizationSlug: 'harbor-cafe',
+    branchIds: ['11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+  },
+  // ── Marian Bistro – Auditor ──
+  {
+    id: 'b3333333-3333-3333-3333-333333333333',
+    email: 'accounts@marianbistro.com',
+    fullName: 'Priya Sharma',
+    role: 'auditor',
     organizationId: '22222222-2222-2222-2222-222222222222',
     organizationName: 'Marian Bistro',
     organizationSlug: 'marian-bistro',
@@ -60,10 +110,10 @@ export const SEED_ORGANIZATIONS: Database['public']['Tables']['organizations']['
     name: 'Harbor Café',
     slug: 'harbor-cafe',
     status: 'active',
-    default_currency: 'USD',
-    currency_symbol: '$',
+    default_currency: 'INR',
+    currency_symbol: '₹',
     currency_decimals: 2,
-    timezone: 'America/New_York',
+    timezone: 'Asia/Kolkata',
     branding: { brandColor: '#2563eb', accentColor: '#f59e0b' },
     created_at: '2026-10-19T00:00:00Z',
     updated_at: '2026-10-19T00:00:00Z',
@@ -74,10 +124,10 @@ export const SEED_ORGANIZATIONS: Database['public']['Tables']['organizations']['
     name: 'Marian Bistro',
     slug: 'marian-bistro',
     status: 'active',
-    default_currency: 'USD',
-    currency_symbol: '$',
+    default_currency: 'INR',
+    currency_symbol: '₹',
     currency_decimals: 2,
-    timezone: 'America/Chicago',
+    timezone: 'Asia/Kolkata',
     branding: { brandColor: '#059669', accentColor: '#e11d48' },
     created_at: '2026-10-19T00:00:00Z',
     updated_at: '2026-10-19T00:00:00Z',

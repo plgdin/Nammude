@@ -4,12 +4,12 @@ import { formatCurrency, formatNumber, roundMoney } from '@/lib/currency';
 describe('Currency and Financial Utility', () => {
   it('formats currency with symbol and 2 decimal places', () => {
     const formatted = formatCurrency(24.5);
-    expect(formatted).toBe('$24.50');
+    expect(formatted).toBe('₹24.50');
   });
 
   it('handles zero and decimal amounts correctly', () => {
-    expect(formatCurrency(0)).toBe('$0.00');
-    expect(formatCurrency(1250.75)).toBe('$1,250.75');
+    expect(formatCurrency(0)).toBe('₹0.00');
+    expect(formatCurrency(1250.75)).toBe('₹1,250.75');
     expect(formatNumber(1250.75)).toBe('1,250.75');
   });
 

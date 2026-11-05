@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SalesTrendChart } from './SalesTrendChart';
 import {
-  DollarSign,
+  IndianRupee,
   ShoppingBag,
   TrendingUp,
   CreditCard,
@@ -88,7 +88,7 @@ export const DashboardScreen: React.FC = () => {
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-gray-400">Net Revenue</span>
             <div className="h-8 w-8 rounded-lg bg-blue-950/80 border border-blue-800/60 flex items-center justify-center text-blue-400">
-              <DollarSign className="h-4 w-4" />
+              <IndianRupee className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-2">

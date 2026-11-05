@@ -4,7 +4,7 @@ import { recipeService } from '../services/recipeService';
 import { formatCurrency } from '@/lib/currency';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { ChefHat, Scale, DollarSign } from 'lucide-react';
+import { ChefHat, Scale, IndianRupee } from 'lucide-react';
 
 interface Props {
   organizationId: string;
@@ -110,7 +110,7 @@ export const RecipeManagementTab: React.FC<Props> = ({ organizationId }) => {
 
             <div className="mt-4 pt-3 border-t border-stone-100 flex items-center justify-between text-xs text-stone-500">
               <span className="flex items-center space-x-1">
-                <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                <IndianRupee className="w-3.5 h-3.5 text-emerald-600" />
                 <span>Auto-deducted on confirmed POS orders</span>
               </span>
               <span className="text-stone-400">Strict version locked</span>

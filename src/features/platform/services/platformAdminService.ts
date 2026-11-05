@@ -10,8 +10,8 @@ let mockOrganizations: PlatformOrganization[] = [
     name: 'Bella Italia Bistro',
     slug: 'bella-italia',
     status: 'active',
-    default_currency: 'USD',
-    timezone: 'America/New_York',
+    default_currency: 'INR',
+    timezone: 'Asia/Kolkata',
     created_at: '2026-09-01T10:00:00Z',
     branches_count: 2,
     subscription: {
@@ -52,8 +52,8 @@ let mockOrganizations: PlatformOrganization[] = [
     name: 'Zenith Ramen Bar',
     slug: 'zenith-ramen',
     status: 'suspended',
-    default_currency: 'USD',
-    timezone: 'America/Los_Angeles',
+    default_currency: 'INR',
+    timezone: 'Asia/Kolkata',
     created_at: '2026-10-01T08:00:00Z',
     branches_count: 1,
     subscription: {
@@ -287,6 +287,129 @@ export const platformAdminService = {
       return (data || []) as PlatformAuditLog[];
     } catch {
       return [...mockAuditLogs];
+    }
+  },
+
+  async createOrganization(params: {
+    name: string;
+    slug: string;
+    currency?: string;
+    planId?: string;
+    planName?: string;
+    ownerEmail?: string;
+    ownerPassword?: string;
+    ownerName?: string;
+    branchName?: string;
+  }): Promise<PlatformOrganization> {
+    const slug = params.slug.toLowerCase().trim().replace(/[^a-z0-9-]+/g, '-');
+    const currency = params.currency || 'INR';
+    const planName = params.planName || 'Professional';
+    const planId = params.planId || 'plan-pro';
+    const orgId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `org-${Date.now()}`;
+
+    if (isMock()) {
+      const newOrg: PlatformOrganization = {
+        id: orgId,
+        name: params.name,
+        slug,
+        status: 'active',
+        default_currency: currency,
+        timezone: 'Asia/Kolkata',
+        created_at: new Date().toISOString(),
+        branches_count: 1,
+        subscription: {
+          plan_id: planId,
+          plan_name: planName,
+          status: 'active',
+          billing_cycle: 'monthly',
+          current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+        },
+        onboarding: {
+          is_completed: true,
+          current_step: 9,
+        },
+      };
+
+      mockOrganizations.unshift(newOrg);
+      mockAuditLogs.unshift({
+        id: `log-${Date.now()}`,
+        actor_id: null,
+        action: 'ORGANIZATION_CREATED',
+        target_org_id: orgId,
+        details: { name: params.name, slug, owner: params.ownerEmail },
+        ip_address: null,
+        created_at: new Date().toISOString(),
+      });
+
+      return newOrg;
+    }
+
+    try {
+      const { data: org, error: orgErr } = await (supabase.from('organizations') as any)
+        .insert({
+          id: orgId,
+          name: params.name,
+          slug,
+          status: 'active',
+          default_currency: currency,
+          currency_symbol: currency === 'USD' ? '$' : '₹',
+          timezone: 'Asia/Kolkata',
+          branding: { brandColor: '#2563eb', accentColor: '#f59e0b' },
+        })
+        .select()
+        .single();
+
+      if (orgErr) throw orgErr;
+
+      // Create primary branch
+      const branchId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `br-${Date.now()}`;
+      await (supabase.from('branches') as any).insert({
+        id: branchId,
+        organization_id: org.id,
+        name: params.branchName || 'Main Branch',
+        slug: 'main',
+        code: `${slug.substring(0, 3).toUpperCase()}-01`,
+        address_line1: '123 Main Street',
+        city: 'Kochi',
+        country: 'IN',
+        status: 'active',
+      });
+
+      // Create starter dining tables
+      const starterTables = Array.from({ length: 6 }, (_, i) => ({
+        organization_id: org.id,
+        branch_id: branchId,
+        table_number: `T${i + 1}`,
+        section: i < 3 ? 'Indoor' : 'Outdoor',
+        capacity: 4,
+        current_status: 'available',
+      }));
+      await (supabase.from('dining_tables') as any).insert(starterTables);
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        status: org.status,
+        default_currency: org.default_currency,
+        timezone: org.timezone,
+        created_at: org.created_at,
+        branches_count: 1,
+        subscription: {
+          plan_id: planId,
+          plan_name: planName,
+          status: 'active',
+          billing_cycle: 'monthly',
+          current_period_end: new Date(Date.now() + 30 * 86400000).toISOString(),
+        },
+        onboarding: {
+          is_completed: true,
+          current_step: 9,
+        },
+      };
+    } catch (err) {
+      console.error('Failed to create organization in database:', err);
+      throw err;
     }
   },
 };

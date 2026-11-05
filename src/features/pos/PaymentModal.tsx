@@ -160,7 +160,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-gray-400">Cash Received:</span>
                   <div className="flex items-center gap-1">
-                    <span className="text-gray-400 font-mono">$</span>
+                    <span className="text-gray-400 font-mono">₹</span>
                     <input
                       type="number"
                       step="1"

@@ -13,8 +13,8 @@ let localOnboardingStore: Record<string, OnboardingState> = {
     step_data: {
       org_name: 'Bella Italia Bistro',
       org_slug: 'bella-italia',
-      currency: 'USD',
-      timezone: 'America/New_York',
+      currency: 'INR',
+      timezone: 'Asia/Kolkata',
       branch_name: 'Main Downtown',
       selected_plan_id: 'plan-pro',
     },

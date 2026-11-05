@@ -5,7 +5,7 @@ import {
   Filter,
   Plus,
   Award,
-  DollarSign,
+  IndianRupee,
   Phone,
   Mail,
   Edit2,
@@ -15,6 +15,7 @@ import {
   Star,
   Settings,
 } from 'lucide-react';
+import { formatCurrency } from '@/lib/currency';
 import { useOrganization } from '@/features/organization/OrganizationContext';
 import { crmService } from './services/crmService';
 import { loyaltyService } from '@/features/loyalty/services/loyaltyService';
@@ -198,10 +199,10 @@ export const CustomersScreen: React.FC = () => {
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl">
           <div className="flex justify-between items-center text-slate-400 mb-2">
             <span className="text-xs font-semibold uppercase tracking-wider">Total CRM Spend</span>
-            <DollarSign className="w-4 h-4 text-emerald-400" />
+            <IndianRupee className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="text-3xl font-extrabold text-emerald-400">
-            ${totalSpend.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            {formatCurrency(totalSpend)}
           </div>
           <p className="mt-1 text-xs text-slate-500">Across all completed dining orders</p>
         </div>
@@ -215,7 +216,7 @@ export const CustomersScreen: React.FC = () => {
             {totalPoints.toLocaleString()} pts
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            {loyaltyConfig?.is_enabled ? 'Earn rate: 1 pt / $1' : 'Loyalty currently paused'}
+            {loyaltyConfig?.is_enabled ? 'Earn rate: 1 pt / ₹1' : 'Loyalty currently paused'}
           </p>
         </div>
       </div>
@@ -311,7 +312,7 @@ export const CustomersScreen: React.FC = () => {
                   </td>
                   <td className="py-4 px-4">
                     <div className="font-bold text-white">
-                      ${c.total_spend_amount.toFixed(2)}
+                      {formatCurrency(c.total_spend_amount)}
                     </div>
                     <div className="text-xs text-slate-500">{c.total_orders_count} orders</div>
                   </td>
@@ -566,7 +567,7 @@ export const CustomersScreen: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">
-                  Points Earned per $1 Spent
+                  Points Earned per ₹1 Spent
                 </label>
                 <input
                   type="number"
@@ -585,7 +586,7 @@ export const CustomersScreen: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">
-                  Redemption Value per Point ($)
+                  Redemption Value per Point (₹)
                 </label>
                 <input
                   type="number"
@@ -600,7 +601,7 @@ export const CustomersScreen: React.FC = () => {
                   }
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">Default 0.01 means 100 points = $1.00</p>
+                <p className="text-[11px] text-slate-500 mt-1">Default 0.01 means 100 points = ₹1.00</p>
               </div>
 
               <div>

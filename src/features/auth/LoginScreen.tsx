@@ -2,11 +2,24 @@ import React, { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { SEED_USERS } from '@/mocks/auth.fixtures';
+import { getDefaultRouteForRole } from '@/lib/permissions';
+import { MembershipRole } from '@/types/database.types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Badge } from '@/components/ui/Badge';
 import { Coffee, Lock, Mail, AlertCircle, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
+
+/** Role badge color mapping */
+const ROLE_COLORS: Record<string, string> = {
+  platform_admin: 'bg-indigo-950/60 text-indigo-300 border-indigo-700/40',
+  owner: 'bg-emerald-950/60 text-emerald-300 border-emerald-700/40',
+  general_manager: 'bg-blue-950/60 text-blue-300 border-blue-700/40',
+  cashier: 'bg-amber-950/60 text-amber-300 border-amber-700/40',
+  kitchen: 'bg-orange-950/60 text-orange-300 border-orange-700/40',
+  inventory: 'bg-cyan-950/60 text-cyan-300 border-cyan-700/40',
+  auditor: 'bg-purple-950/60 text-purple-300 border-purple-700/40',
+};
 
 export const LoginScreen: React.FC = () => {
   const navigate = useNavigate();
@@ -17,7 +30,11 @@ export const LoginScreen: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const destination = (location.state as any)?.from?.pathname || '/';
+  const explicitDestination = (location.state as any)?.from?.pathname;
+
+  const resolveDestination = (role: MembershipRole) => {
+    return explicitDestination || getDefaultRouteForRole(role);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -29,14 +46,17 @@ export const LoginScreen: React.FC = () => {
     setIsLoading(false);
 
     if (result.success) {
-      navigate(destination, { replace: true });
+      // For live auth, look up role from matched seed or default
+      const matchedSeed = SEED_USERS.find((u) => u.email.toLowerCase() === email.toLowerCase().trim());
+      const role = (matchedSeed?.role || 'owner') as MembershipRole;
+      navigate(resolveDestination(role), { replace: true });
     }
   };
 
   const handleQuickSeedLogin = (userFixture: (typeof SEED_USERS)[0]) => {
     clearError();
     signInWithMockUser(userFixture);
-    navigate(destination, { replace: true });
+    navigate(resolveDestination(userFixture.role as MembershipRole), { replace: true });
   };
 
   return (
@@ -48,7 +68,7 @@ export const LoginScreen: React.FC = () => {
             <Coffee className="h-6 w-6" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-white">
-            Restaurant OS Platform
+            Tablewise POS Platform
           </h1>
           <p className="text-xs text-gray-400">
             Secure, multi-tenant restaurant operations & management
@@ -65,7 +85,7 @@ export const LoginScreen: React.FC = () => {
               </Badge>
             </div>
             <CardDescription>
-              Enter your credentials to access your restaurant branch
+              Enter your credentials to access your restaurant dashboard
             </CardDescription>
           </CardHeader>
 
@@ -79,7 +99,7 @@ export const LoginScreen: React.FC = () => {
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                label="Staff Email Address"
+                label="Email Address"
                 type="email"
                 placeholder="name@restaurant.com"
                 value={email}
@@ -115,9 +135,9 @@ export const LoginScreen: React.FC = () => {
                 <div className="flex items-center justify-between text-[11px] text-gray-400">
                   <span className="font-semibold uppercase tracking-wider text-gray-300 flex items-center gap-1">
                     <Sparkles className="h-3.5 w-3.5 text-amber-400" />
-                    Quick Dev Login (Seed Personas)
+                    Quick Dev Login (Test Personas)
                   </span>
-                  <span>Select to test</span>
+                  <span>Select role to test</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -128,9 +148,13 @@ export const LoginScreen: React.FC = () => {
                       onClick={() => handleQuickSeedLogin(seed)}
                       className="flex flex-col text-left p-2.5 rounded-xl border border-surface-border bg-surface-elevated hover:bg-surface-active hover:border-gray-500 transition-colors"
                     >
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-white">{seed.fullName}</span>
-                        <span className="text-[10px] uppercase font-mono px-1.5 py-0.2 rounded bg-surface text-gray-300">
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-semibold text-white truncate">{seed.fullName}</span>
+                        <span
+                          className={`text-[10px] uppercase font-mono px-1.5 py-0.5 rounded border ${
+                            ROLE_COLORS[seed.role] || 'bg-surface text-gray-300'
+                          }`}
+                        >
                           {seed.role}
                         </span>
                       </div>

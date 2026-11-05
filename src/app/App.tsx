@@ -66,6 +66,11 @@ const PublicMenuScreen = lazy(() =>
     default: m.PublicMenuScreen,
   }))
 );
+const SettingsScreen = lazy(() =>
+  import('@/features/settings/SettingsScreen').then((m) => ({
+    default: m.SettingsScreen,
+  }))
+);
 
 // Loading Fallback
 const RouteLoadingFallback: React.FC = () => (
@@ -204,6 +209,14 @@ export const App: React.FC = () => {
                 }
               />
               <Route path="/crm" element={<Navigate to="/customers" replace />} />
+              <Route
+                path="/settings"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <SettingsScreen />
+                  </Suspense>
+                }
+              />
             </Route>
 
             {/* Catch-all redirect */}

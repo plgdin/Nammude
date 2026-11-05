@@ -2,6 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useOrganization } from '@/features/organization/OrganizationContext';
 import { useAuth } from '@/features/auth/AuthContext';
+import { hasPermission, Permission, PERMISSIONS } from '@/lib/permissions';
 import {
   LayoutDashboard,
   UtensilsCrossed,
@@ -16,9 +17,32 @@ import {
   ChevronDown,
   Users,
   Compass,
+  Settings,
+  LogOut,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+
+interface SidebarRoute {
+  name: string;
+  path: string;
+  icon: React.ElementType;
+  permission: Permission;
+}
+
+const ALL_ROUTES: SidebarRoute[] = [
+  { name: 'Dashboard', path: '/', icon: LayoutDashboard, permission: PERMISSIONS.DASHBOARD },
+  { name: 'Point of Sale (POS)', path: '/pos', icon: UtensilsCrossed, permission: PERMISSIONS.POS },
+  { name: 'Kitchen KDS', path: '/kitchen', icon: CookingPot, permission: PERMISSIONS.KITCHEN },
+  { name: 'Inventory & Stock', path: '/inventory', icon: Boxes, permission: PERMISSIONS.INVENTORY },
+  { name: 'Financials & Reports', path: '/financials', icon: ReceiptText, permission: PERMISSIONS.FINANCIALS },
+  { name: 'OCR Ingestion', path: '/documents', icon: ScanText, permission: PERMISSIONS.DOCUMENTS },
+  { name: 'Staff Checklists', path: '/checklists', icon: ClipboardCheck, permission: PERMISSIONS.CHECKLISTS },
+  { name: 'Customer CRM', path: '/customers', icon: Users, permission: PERMISSIONS.CUSTOMERS },
+  { name: 'Restaurant Setup', path: '/onboarding', icon: Compass, permission: PERMISSIONS.ONBOARDING },
+  { name: 'Settings', path: '/settings', icon: Settings, permission: PERMISSIONS.SETTINGS },
+  { name: 'Platform Admin', path: '/platform-admin', icon: ShieldCheck, permission: PERMISSIONS.PLATFORM_ADMIN },
+];
 
 export const Sidebar: React.FC = () => {
   const {
@@ -27,22 +51,10 @@ export const Sidebar: React.FC = () => {
     switchOrganization,
     currentMembership,
   } = useOrganization();
-  const { profile, user } = useAuth();
+  const { profile, user, activeRole, signOut } = useAuth();
 
-  const activeRoutes = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Point of Sale (POS)', path: '/pos', icon: UtensilsCrossed },
-    { name: 'Kitchen KDS', path: '/kitchen', icon: CookingPot },
-    { name: 'Inventory & Stock', path: '/inventory', icon: Boxes },
-    { name: 'Financials & Reports', path: '/financials', icon: ReceiptText },
-    { name: 'OCR Ingestion', path: '/documents', icon: ScanText },
-    { name: 'Staff Checklists', path: '/checklists', icon: ClipboardCheck },
-    { name: 'Customer CRM', path: '/customers', icon: Users },
-    { name: 'Restaurant Setup', path: '/onboarding', icon: Compass },
-    { name: 'Platform Admin', path: '/platform-admin', icon: ShieldCheck },
-  ];
-
-  const futureRoutes: Array<{ name: string; icon: any; phase: string }> = [];
+  // Filter routes by role permissions
+  const visibleRoutes = ALL_ROUTES.filter((route) => hasPermission(activeRole, route.permission));
 
   return (
     <aside className="hidden lg:flex w-64 flex-col border-r border-surface-border bg-surface select-none">
@@ -54,7 +66,7 @@ export const Sidebar: React.FC = () => {
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-sm font-bold text-white tracking-tight truncate">
-              {currentOrganization?.name || 'Restaurant OS'}
+              {currentOrganization?.name || 'Tablewise'}
             </h2>
             <p className="text-[10px] text-gray-400 font-mono truncate">
               {currentOrganization?.slug || 'platform'}
@@ -106,7 +118,7 @@ export const Sidebar: React.FC = () => {
               Operational Views
             </p>
             <nav className="space-y-1">
-              {activeRoutes.map((route) => (
+              {visibleRoutes.map((route) => (
                 <NavLink
                   key={route.path}
                   to={route.path}
@@ -125,50 +137,36 @@ export const Sidebar: React.FC = () => {
               ))}
             </nav>
           </div>
-
-          <div>
-            <p className="px-3 text-[10px] font-semibold uppercase tracking-wider text-gray-500 mb-2">
-              Planned Capabilities
-            </p>
-            <div className="space-y-1">
-              {futureRoutes.map((route) => (
-                <div
-                  key={route.name}
-                  className="flex items-center justify-between rounded-lg px-3 py-2 text-xs text-gray-500 cursor-not-allowed hover:bg-surface-elevated/40"
-                  title={`${route.name} is scheduled for ${route.phase}`}
-                >
-                  <div className="flex items-center gap-3">
-                    <route.icon className="h-4 w-4 text-gray-500" />
-                    <span>{route.name}</span>
-                  </div>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface-elevated text-gray-400 font-mono">
-                    {route.phase}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
 
         {/* User / Session Card */}
-        <div className="rounded-xl border border-surface-border bg-surface-elevated p-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold text-xs">
-              {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
+        <div className="space-y-3">
+          <div className="rounded-xl border border-surface-border bg-surface-elevated p-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-950 text-emerald-400 border border-emerald-800/60 font-semibold text-xs">
+                {(profile?.full_name || user?.email || 'U')[0].toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium text-white truncate">
+                  {profile?.full_name || 'Staff User'}
+                </p>
+                <p className="text-[10px] text-gray-400 flex items-center gap-1">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <span className="uppercase font-mono">
+                    {activeRole || currentMembership?.role || 'staff'}
+                  </span>
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-white truncate">
-                {profile?.full_name || 'Staff User'}
-              </p>
-              <p className="text-[10px] text-gray-400 flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                <span className="uppercase font-mono">
-                  {currentMembership?.role || 'staff'}
-                </span>
-              </p>
-            </div>
-            <ShieldCheck className="h-4 w-4 text-gray-400" />
           </div>
+
+          <button
+            onClick={signOut}
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium text-rose-400 hover:bg-rose-950/40 hover:text-rose-300 transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
     </aside>
