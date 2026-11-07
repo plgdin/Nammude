@@ -1,13 +1,92 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { mockDashboardData } from '@/mocks/dashboard.data';
-import { mockIngredients } from '@/mocks/inventory.data';
+import { DashboardMetrics } from '@/mocks/dashboard.data';
 import { BranchConfig } from '@/config/tenant.config';
+import { useOrganization } from '@/features/organization/OrganizationContext';
 import { formatCurrency, formatNumber } from '@/lib/currency';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { SalesTrendChart } from './SalesTrendChart';
+import { dashboardService, DashboardData } from './services/dashboardService';
+
+interface LowStockView {
+  id: string;
+  name: string;
+  currentStock: number;
+  unit: string;
+  reorderLevel: number;
+  status: 'ok' | 'low' | 'critical';
+}
+
+const TENDER_LABELS: Record<string, string> = {
+  card: 'Credit / Debit Card',
+  cash: 'Cash Drawer',
+  upi_qr: 'Digital Wallet / UPI',
+  wallet: 'Digital Wallet',
+  bank_transfer: 'Bank Transfer',
+  account: 'House Account',
+};
+
+const EMPTY_DATA: DashboardMetrics = {
+  reportingPeriod: '',
+  branchName: '',
+  grossSales: 0,
+  discounts: 0,
+  netRevenue: 0,
+  ordersCount: 0,
+  averageOrderValue: 0,
+  taxCollected: 0,
+  paymentsCollectedTotal: 0,
+  paymentsByMethod: [],
+  operatingExpensesToday: 0,
+  stockAlertsCount: 0,
+  salesTrend7Days: [],
+  hourlySalesToday: [],
+  bestSellers: [],
+  recentOrders: [],
+};
+
+function toDashboardMetrics(live: DashboardData, branchName: string): DashboardMetrics {
+  const report = live.reportToday;
+  return {
+    reportingPeriod: `Today, ${new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`,
+    branchName,
+    grossSales: report.revenue.gross_sales,
+    discounts: report.revenue.discounts,
+    netRevenue: report.revenue.net_sales,
+    ordersCount: report.orders_count,
+    averageOrderValue: live.averageOrderValue,
+    taxCollected: report.revenue.tax_collected,
+    paymentsCollectedTotal: report.cash_and_collections.net_collections,
+    paymentsByMethod: live.tenderMix.map((t) => ({
+      method: TENDER_LABELS[t.method] || t.method,
+      amount: t.amount,
+      percentage: t.percentage,
+    })),
+    operatingExpensesToday: report.profitability.operating_expenses,
+    stockAlertsCount: live.lowStockItems.length,
+    salesTrend7Days: live.salesTrend7Days,
+    hourlySalesToday: [],
+    bestSellers: live.bestSellers.map((b) => ({
+      id: b.id,
+      name: b.name,
+      category: b.category,
+      unitsSold: b.unitsSold,
+      revenue: b.revenue,
+    })),
+    recentOrders: live.recentOrders.map((o) => ({
+      id: o.id,
+      orderNumber: o.orderNumber,
+      type: o.type as DashboardMetrics['recentOrders'][number]['type'],
+      table: o.table,
+      itemCount: o.itemCount,
+      totalAmount: o.totalAmount,
+      status: o.status as DashboardMetrics['recentOrders'][number]['status'],
+      timeAgo: o.timeAgo,
+    })),
+  };
+}
 import {
   IndianRupee,
   ShoppingBag,
@@ -24,11 +103,39 @@ import {
 export const DashboardScreen: React.FC = () => {
   const navigate = useNavigate();
   const { selectedBranch } = useOutletContext<{ selectedBranch: BranchConfig }>();
-  const data = mockDashboardData;
+  const { currentOrganization } = useOrganization();
 
-  const lowStockItems = mockIngredients.filter(
-    (item) => item.status === 'critical' || item.status === 'low'
-  );
+  const [data, setData] = useState<DashboardMetrics>({ ...EMPTY_DATA, branchName: selectedBranch?.name || '' });
+  const [lowStockItems, setLowStockItems] = useState<LowStockView[]>([]);
+
+  const orgId = currentOrganization?.id || '11111111-1111-1111-1111-111111111111';
+  const branchId = selectedBranch?.id || '';
+
+  useEffect(() => {
+    let isMounted = true;
+    dashboardService
+      .getDashboardData({ organizationId: orgId, branchId })
+      .then((live) => {
+        if (!isMounted) return;
+        setData(toDashboardMetrics(live, selectedBranch?.name || ''));
+        setLowStockItems(
+          live.lowStockItems.map((item) => ({
+            id: item.id,
+            name: item.name,
+            currentStock: item.current_stock ?? 0,
+            unit: item.base_unit,
+            reorderLevel: item.reorder_level,
+            status: item.status || 'low',
+          }))
+        );
+      })
+      .catch((err) => {
+        console.warn('[DashboardScreen] Failed to load dashboard data:', err);
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, [orgId, branchId]);
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6">

@@ -22,6 +22,11 @@ export const AppShell: React.FC = () => {
           title: 'POS Register',
           subtitle: `${currentBranch?.name || 'Main Branch'} • Checkout terminal`,
         };
+      case '/orders':
+        return {
+          title: 'Orders & Refunds',
+          subtitle: `${currentBranch?.name || 'Main Branch'} • Order search, corrections & auditable refunds`,
+        };
       case '/inventory':
         return {
           title: 'Stock & Ingredients',

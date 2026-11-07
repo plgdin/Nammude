@@ -9,6 +9,7 @@ import {
   Boxes,
   CookingPot,
   ReceiptText,
+  ClipboardList,
   ScanText,
   ClipboardCheck,
   Coffee,
@@ -33,6 +34,7 @@ interface SidebarRoute {
 const ALL_ROUTES: SidebarRoute[] = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard, permission: PERMISSIONS.DASHBOARD },
   { name: 'Point of Sale (POS)', path: '/pos', icon: UtensilsCrossed, permission: PERMISSIONS.POS },
+  { name: 'Orders & Refunds', path: '/orders', icon: ClipboardList, permission: PERMISSIONS.POS },
   { name: 'Kitchen KDS', path: '/kitchen', icon: CookingPot, permission: PERMISSIONS.KITCHEN },
   { name: 'Inventory & Stock', path: '/inventory', icon: Boxes, permission: PERMISSIONS.INVENTORY },
   { name: 'Financials & Reports', path: '/financials', icon: ReceiptText, permission: PERMISSIONS.FINANCIALS },

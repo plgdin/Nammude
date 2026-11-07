@@ -3,6 +3,8 @@ import { useOrganization } from '@/features/organization/OrganizationContext';
 import { useAuth } from '@/features/auth/AuthContext';
 import { SEED_USERS, SeedUserFixture } from '@/mocks/auth.fixtures';
 import { StaffEditModal } from './StaffEditModal';
+import { settingsService } from './services/settingsService';
+import { tableService } from '@/features/pos/services/tableService';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -75,11 +77,14 @@ const ROLE_BADGE_VARIANT: Record<string, 'success' | 'warning' | 'info' | 'dange
 };
 
 export const SettingsScreen: React.FC = () => {
-  const { currentOrganization, permittedBranches } = useOrganization();
+  const { currentOrganization, currentBranch, permittedBranches, refreshContext } = useOrganization();
   const { activeRole } = useAuth();
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [saved, setSaved] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [qrTables, setQrTables] = useState<TableQrItem[]>([]);
   const [copiedQr, setCopiedQr] = useState<string | null>(null);
   const [selectedTableForQr, setSelectedTableForQr] = useState<TableQrItem | null>(null);
   const currentOrigin =
@@ -94,6 +99,46 @@ export const SettingsScreen: React.FC = () => {
   const [timezone, setTimezone] = useState(currentOrganization?.timezone || 'Asia/Kolkata');
   const [currency, setCurrency] = useState(currentOrganization?.default_currency || 'INR');
   const [brandColor, setBrandColor] = useState(currentOrganization?.branding?.brandColor || '#2563eb');
+
+  // Keep the form in sync when the active organization changes.
+  useEffect(() => {
+    if (!currentOrganization) return;
+    setRestaurantName(currentOrganization.name || '');
+    setRestaurantSlug(currentOrganization.slug || '');
+    setTimezone(currentOrganization.timezone || 'Asia/Kolkata');
+    setCurrency(currentOrganization.default_currency || 'INR');
+    setBrandColor(currentOrganization.branding?.brandColor || '#2563eb');
+  }, [currentOrganization?.id]);
+
+  // Load real dining tables for QR codes.
+  useEffect(() => {
+    let isMounted = true;
+    const loadTables = async () => {
+      if (!currentBranch?.id) {
+        setQrTables([]);
+        return;
+      }
+      try {
+        const tables = await tableService.getTablesByBranch(currentBranch.id);
+        if (!isMounted) return;
+        setQrTables(
+          tables.map((t) => ({
+            id: t.id,
+            number: t.table_number,
+            section: t.section || 'Main Dining',
+            qrUrl: `${orderingDomain.replace(/\/$/, '')}/menu/${restaurantSlug || currentOrganization?.slug || 'restaurant'}?table=${encodeURIComponent(t.table_number)}&token=${t.qr_token}`,
+          }))
+        );
+      } catch {
+        if (isMounted) setQrTables([]);
+      }
+    };
+    loadTables();
+    return () => {
+      isMounted = false;
+    };
+    // QR URLs depend on the domain/slug inputs, so rebuild when they change.
+  }, [currentBranch?.id, orderingDomain, restaurantSlug, currentOrganization?.slug]);
 
   // Staff list state initialized with seed users scoped to current org
   const [staffList, setStaffList] = useState<SeedUserFixture[]>(() =>
@@ -133,17 +178,29 @@ export const SettingsScreen: React.FC = () => {
     });
   };
 
-  // Table QR data with real website domain URLs
-  const mockTables = Array.from({ length: 8 }, (_, i) => ({
-    id: `table-${i + 1}`,
-    number: `T${i + 1}`,
-    section: i < 4 ? 'Indoor' : 'Outdoor',
-    qrUrl: `${orderingDomain.replace(/\/$/, '')}/menu/${restaurantSlug || currentOrganization?.slug || 'huddles'}?table=${i + 1}`,
-  }));
-
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (!currentOrganization) {
+      setSaveError('No active organization to save.');
+      return;
+    }
+    setIsSaving(true);
+    setSaveError(null);
+    const result = await settingsService.updateOrganizationSettings(currentOrganization.id, {
+      name: restaurantName,
+      slug: restaurantSlug,
+      timezone,
+      default_currency: currency,
+      brandColor,
+      accentColor: currentOrganization.branding?.accentColor,
+    });
+    setIsSaving(false);
+    if (!result.success) {
+      setSaveError(result.error || 'Unable to save settings.');
+      return;
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+    await refreshContext();
   };
 
   const handleCopyQr = (url: string, id: string) => {
@@ -272,8 +329,19 @@ export const SettingsScreen: React.FC = () => {
                 </div>
               </div>
 
-              <Button variant="primary" onClick={handleSave} className="w-full mt-2">
-                {saved ? <><Check className="mr-2 h-4 w-4" /> Saved!</> : <><Save className="mr-2 h-4 w-4" /> Save Changes</>}
+              {saveError && (
+                <p className="rounded-lg border border-rose-800/60 bg-rose-950/50 px-3 py-2 text-xs text-rose-300">
+                  {saveError}
+                </p>
+              )}
+              <Button variant="primary" onClick={handleSave} disabled={isSaving} className="w-full mt-2">
+                {isSaving ? (
+                  <><span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-brand-fg/40 border-t-transparent inline-block" /> Saving...</>
+                ) : saved ? (
+                  <><Check className="mr-2 h-4 w-4" /> Saved!</>
+                ) : (
+                  <><Save className="mr-2 h-4 w-4" /> Save Changes</>
+                )}
               </Button>
             </CardContent>
           </Card>
@@ -461,8 +529,14 @@ export const SettingsScreen: React.FC = () => {
             </div>
           </div>
 
+          {qrTables.length === 0 && (
+            <div className="rounded-xl border border-surface-border bg-surface-elevated p-8 text-center text-sm text-gray-400">
+              No dining tables configured for this branch yet. Add tables in POS table management to generate QR codes.
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {mockTables.map((table) => (
+            {qrTables.map((table) => (
               <Card
                 key={table.id}
                 className="overflow-hidden group hover:border-brand/60 transition-all duration-200 cursor-pointer"

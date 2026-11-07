@@ -1,6 +1,20 @@
 import { supabase } from '@/lib/supabase';
 import { env } from '@/lib/env';
 import { FinancialReport } from '../types';
+import { orderService } from '@/features/pos/services/orderService';
+import { paymentService } from '@/features/pos/services/paymentService';
+import { expenseService } from './expenseService';
+import { inventoryService } from '@/features/inventory/services/inventoryService';
+import { purchasingService } from '@/features/inventory/services/purchasingService';
+
+const money = (value: number) => Number(value.toFixed(2));
+
+const percent = (part: number, whole: number) =>
+  whole > 0 ? Number(((part / whole) * 100).toFixed(2)) : 0;
+
+/** Payments recorded through the local simulated gateway are quarantined from real collections. */
+const isSimulatedPayment = (payment: { reference_number?: string | null }) =>
+  /^SIM-/i.test(payment.reference_number || '');
 
 export const financialReportService = {
   /**
@@ -23,7 +37,7 @@ export const financialReportService = {
         cogs -= mov.total_cost;
       }
     }
-    return Math.max(0, Number(cogs.toFixed(2)));
+    return Math.max(0, money(cogs));
   },
 
   /**
@@ -50,17 +64,20 @@ export const financialReportService = {
       .filter((p) => p.payment_date.split('T')[0] <= endTarget)
       .reduce((sum, p) => sum + p.amount, 0);
 
-    const outstanding = Math.max(0, Number((cumInvoiced - cumPaid).toFixed(2)));
+    const outstanding = Math.max(0, money(cumInvoiced - cumPaid));
 
     return {
-      cumulativeInvoiced: Number(cumInvoiced.toFixed(2)),
-      cumulativePaid: Number(cumPaid.toFixed(2)),
+      cumulativeInvoiced: money(cumInvoiced),
+      cumulativePaid: money(cumPaid),
       outstandingPayable: outstanding,
     };
   },
 
   /**
-   * Fetch comprehensive accrual and cash financial report
+   * Build the report from authoritative source records:
+   * orders (revenue), stock movements (COGS/waste), expenses (OPEX),
+   * payments + refunds (collections), verified GRNs + supplier payments (AP).
+   * No invented totals: an empty window reports zeros.
    */
   async getReport(params: {
     organizationId: string;
@@ -86,39 +103,124 @@ export const financialReportService = {
           return data as unknown as FinancialReport;
         }
       } catch (err) {
-        console.warn('[financialReportService] Remote RPC failed, falling back to local calculation:', err);
+        console.warn('[financialReportService] Remote RPC failed, aggregating source records:', err);
       }
     }
 
-    // Default robust fallback baseline
-    const grossSales = 12450.0;
-    const discounts = 350.0;
-    const netSales = grossSales - discounts; // 12100.00
-    const taxCollected = 1027.12; // 8.25% tax liability
-    const totalBilled = netSales + taxCollected;
+    const [orders, payments, refunds, expenses, movements, receipts, supplierPayments] =
+      await Promise.all([
+        orderService.getOrdersForReport({
+          organizationId: params.organizationId,
+          branchId: params.branchId || null,
+          startDate: start,
+          endDate: end,
+        }),
+        paymentService.getPaymentsForReport({
+          organizationId: params.organizationId,
+          branchId: params.branchId || null,
+          startDate: start,
+          endDate: end,
+        }),
+        paymentService.getRefundsForReport({
+          organizationId: params.organizationId,
+          startDate: start,
+          endDate: end,
+        }),
+        expenseService.getExpenses({
+          organizationId: params.organizationId,
+          branchId: params.branchId || undefined,
+          startDate: start,
+          endDate: end,
+        }),
+        inventoryService.getMovementsForReport({
+          organizationId: params.organizationId,
+          branchId: params.branchId || null,
+          startDate: start,
+          endDate: end,
+        }),
+        purchasingService.getGoodsReceiptsForReport({
+          organizationId: params.organizationId,
+          branchId: params.branchId || null,
+          asOfDate: end,
+        }),
+        purchasingService.getSupplierPaymentsForReport({
+          organizationId: params.organizationId,
+          branchId: params.branchId || null,
+          asOfDate: end,
+        }),
+      ]);
 
-    // Realized COGS from historical weighted-average consumption movements (approx 29.5% food cost)
-    const realizedCogs = 3569.5;
-    const wastedLoss = 124.0;
-    const grossProfit = netSales - realizedCogs; // 8530.50
-    const grossMarginPct = Number(((grossProfit / netSales) * 100).toFixed(2)); // 70.50%
+    // --- Revenue (cancelled and draft orders are not recognized sales) ---
+    const recognizedOrders = orders.filter(
+      (o) => o.status !== 'cancelled' && o.status !== 'draft'
+    );
 
-    // Operating expenses (rent, utilities, disposables, maintenance)
-    const opex = 2840.0;
-    const netOperatingProfit = grossProfit - opex; // 5690.50
-    const netMarginPct = Number(((netOperatingProfit / netSales) * 100).toFixed(2)); // 47.03%
+    const grossSales = money(recognizedOrders.reduce((sum, o) => sum + Number(o.subtotal_amount), 0));
+    const discounts = money(recognizedOrders.reduce((sum, o) => sum + Number(o.discount_amount), 0));
+    const taxCollected = money(recognizedOrders.reduce((sum, o) => sum + Number(o.tax_amount), 0));
+    const serviceCharges = money(
+      recognizedOrders.reduce((sum, o) => sum + Number(o.service_charge_amount), 0)
+    );
+    const netSales = money(grossSales - discounts);
+    const totalBilled = money(netSales + taxCollected + serviceCharges);
 
-    // Collections
-    const realCollections = 12900.0;
-    const simulatedCollections = 227.12; // Strictly separated
-    const refundsTotal = 85.0;
+    // --- COGS / waste from the perpetual stock ledger ---
+    const realizedCogs = this.calculateRealizedCOGS(movements);
+    const wastedLoss = money(
+      movements
+        .filter((m) => m.movement_type === 'waste')
+        .reduce((sum, m) => sum + Number(m.total_cost), 0)
+    );
+    const grossProfit = money(netSales - realizedCogs);
+    const grossMarginPct = percent(grossProfit, netSales);
+    const foodCostPct = percent(realizedCogs, netSales);
+
+    // --- Operating expenses (cancelled expenses excluded) ---
+    const activeExpenses = expenses.filter((e) => e.payment_status !== 'cancelled');
+    const opex = money(activeExpenses.reduce((sum, e) => sum + Number(e.amount), 0));
+    const operatingExpensesBreakdown: Record<string, number> = {};
+    for (const expense of activeExpenses) {
+      operatingExpensesBreakdown[expense.category_name] =
+        money((operatingExpensesBreakdown[expense.category_name] || 0) + Number(expense.amount));
+    }
+    const netOperatingProfit = money(grossProfit - opex);
+    const netMarginPct = percent(netOperatingProfit, netSales);
+
+    // --- Collections: real vs simulated gateway, net of real refunds ---
+    const capturedPayments = payments.filter(
+      (p) => p.status === 'completed' || p.status === 'refunded'
+    );
+    const realPayments = capturedPayments.filter((p) => !isSimulatedPayment(p));
+    const simulatedPayments = capturedPayments.filter((p) => isSimulatedPayment(p));
+
+    const realCollections = money(realPayments.reduce((sum, p) => sum + Number(p.amount), 0));
+    const simulatedCollections = money(
+      simulatedPayments.reduce((sum, p) => sum + Number(p.amount), 0)
+    );
+
+    const simulatedPaymentIds = new Set(simulatedPayments.map((p) => p.id));
+    const refundsTotal = money(
+      refunds
+        .filter((r) => !simulatedPaymentIds.has(r.payment_id))
+        .reduce((sum, r) => sum + Number(r.refund_amount), 0)
+    );
+
+    const byPaymentMethod: Record<string, number> = {};
+    for (const payment of realPayments) {
+      byPaymentMethod[payment.payment_method] = money(
+        (byPaymentMethod[payment.payment_method] || 0) + Number(payment.amount)
+      );
+    }
+
+    // --- Supplier payables: verified GRNs cumulative vs disbursements ---
+    const ap = this.calculateCumulativeSupplierAP(receipts, supplierPayments, end);
 
     return {
       organization_id: params.organizationId,
       branch_id: params.branchId || null,
       start_date: start,
       end_date: end,
-      orders_count: 512,
+      orders_count: recognizedOrders.length,
       revenue: {
         gross_sales: grossSales,
         discounts,
@@ -129,7 +231,7 @@ export const financialReportService = {
       cogs: {
         realized_cogs: realizedCogs,
         wasted_loss: wastedLoss,
-        food_cost_percentage: Number(((realizedCogs / netSales) * 100).toFixed(2)),
+        food_cost_percentage: foodCostPct,
       },
       profitability: {
         gross_profit: grossProfit,
@@ -142,23 +244,14 @@ export const financialReportService = {
         real_collections_total: realCollections,
         simulated_collections_total: simulatedCollections,
         refunds_total: refundsTotal,
-        net_collections: realCollections - refundsTotal,
-        by_payment_method: {
-          card: 8200.0,
-          cash: 3450.0,
-          bank_transfer: 1250.0,
-        },
+        net_collections: money(realCollections - refundsTotal),
+        by_payment_method: byPaymentMethod,
       },
-      operating_expenses_breakdown: {
-        'Kitchen Supplies & Disposables': 950.0,
-        'Utilities & Power': 1200.0,
-        'Repairs & Maintenance': 420.0,
-        'Marketing & Local Ads': 270.0,
-      },
+      operating_expenses_breakdown: operatingExpensesBreakdown,
       supplier_payables: {
-        total_invoiced: 4850.0, // Cumulative up to end date
-        total_paid: 3200.0,     // Cumulative up to end date
-        outstanding_payable: 1650.0,
+        total_invoiced: ap.cumulativeInvoiced,
+        total_paid: ap.cumulativePaid,
+        outstanding_payable: ap.outstandingPayable,
       },
     };
   },

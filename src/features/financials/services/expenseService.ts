@@ -186,7 +186,7 @@ export const expenseService = {
         }
 
         const { data, error } = await query;
-        if (!error && data && data.length > 0) {
+        if (!error && data) {
           return data as ExpenseRecord[];
         }
       } catch (err) {
@@ -195,6 +195,7 @@ export const expenseService = {
     }
 
     return localExpenses.filter((e) => {
+      if (e.organization_id !== params.organizationId) return false;
       if (params.branchId && e.branch_id !== params.branchId) return false;
       if (params.status && e.payment_status !== params.status) return false;
       if (params.startDate && e.incurred_date < params.startDate) return false;

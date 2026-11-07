@@ -16,6 +16,11 @@ const PosScreen = lazy(() =>
     default: m.PosScreen,
   }))
 );
+const OrdersScreen = lazy(() =>
+  import('@/features/pos/OrdersScreen').then((m) => ({
+    default: m.OrdersScreen,
+  }))
+);
 const InventoryScreen = lazy(() =>
   import('@/features/inventory/InventoryScreen').then((m) => ({
     default: m.InventoryScreen,
@@ -138,6 +143,14 @@ export const App: React.FC = () => {
                 element={
                   <Suspense fallback={<RouteLoadingFallback />}>
                     <PosScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <OrdersScreen />
                   </Suspense>
                 }
               />

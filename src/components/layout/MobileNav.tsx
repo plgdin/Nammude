@@ -2,7 +2,7 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '@/features/auth/AuthContext';
 import { hasPermission, Permission, PERMISSIONS } from '@/lib/permissions';
-import { LayoutDashboard, UtensilsCrossed, Boxes, ReceiptText, CookingPot, ClipboardCheck, ShieldCheck, Settings } from 'lucide-react';
+import { LayoutDashboard, UtensilsCrossed, Boxes, ReceiptText, CookingPot, ClipboardCheck, ClipboardList, ShieldCheck, Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 interface MobileRoute {
@@ -16,6 +16,7 @@ interface MobileRoute {
 const ALL_MOBILE_ROUTES: MobileRoute[] = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard, permission: PERMISSIONS.DASHBOARD },
   { name: 'POS', path: '/pos', icon: UtensilsCrossed, permission: PERMISSIONS.POS },
+  { name: 'Orders', path: '/orders', icon: ClipboardList, permission: PERMISSIONS.POS },
   { name: 'Kitchen', path: '/kitchen', icon: CookingPot, permission: PERMISSIONS.KITCHEN },
   { name: 'Inventory', path: '/inventory', icon: Boxes, permission: PERMISSIONS.INVENTORY },
   { name: 'Financials', path: '/financials', icon: ReceiptText, permission: PERMISSIONS.FINANCIALS },

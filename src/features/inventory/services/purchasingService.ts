@@ -5,6 +5,7 @@ import {
   PurchaseOrderRecord,
   GoodsReceiptRecord,
 } from '../types';
+import { SupplierPaymentRecord } from '@/features/financials/types';
 
 let localSuppliers: SupplierRecord[] = [
   {
@@ -123,6 +124,24 @@ let localGoodsReceipts: GoodsReceiptRecord[] = [
         created_at: new Date().toISOString(),
       },
     ],
+  },
+];
+
+let localSupplierPayments: SupplierPaymentRecord[] = [
+  {
+    id: 'spay-00000000-0000-0000-0000-000000000001',
+    organization_id: '11111111-1111-1111-1111-111111111111',
+    branch_id: '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    supplier_id: 's1111111-0000-0000-0000-000000000001',
+    goods_receipt_id: 'grn11111-0000-0000-0000-000000000001',
+    amount: 40.0,
+    payment_method: 'bank_transfer',
+    payment_date: new Date().toISOString().split('T')[0],
+    reference_number: 'NEFT-CDD-001',
+    notes: 'Part payment against GRN-2026-001',
+    idempotency_key: 'seed-supplier-payment-001',
+    created_by: null,
+    created_at: new Date().toISOString(),
   },
 ];
 
@@ -443,5 +462,90 @@ export const purchasingService = {
     }
 
     return localGoodsReceipts;
+  },
+
+  /**
+   * Fetch goods receipts for supplier-payables reporting (cumulative as of a date).
+   */
+  async getGoodsReceiptsForReport(params: {
+    organizationId: string;
+    branchId?: string | null;
+    asOfDate: string;
+  }): Promise<GoodsReceiptRecord[]> {
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        let query = supabase
+          .from('goods_receipts')
+          .select('*')
+          .eq('organization_id', params.organizationId)
+          .lte('received_at', `${params.asOfDate}T23:59:59.999Z`)
+          .order('received_at', { ascending: true });
+        if (params.branchId) query = query.eq('branch_id', params.branchId);
+        const { data, error } = await query;
+        if (!error && data) return data as GoodsReceiptRecord[];
+      } catch (err) {
+        console.warn('[purchasingService] Failed to load report GRNs:', err);
+      }
+      return [];
+    }
+    return localGoodsReceipts.filter((gr) => {
+      if (gr.organization_id !== params.organizationId) return false;
+      if (params.branchId && gr.branch_id !== params.branchId) return false;
+      return gr.received_at.slice(0, 10) <= params.asOfDate;
+    });
+  },
+
+  /**
+   * Fetch supplier disbursements for payables reporting (cumulative as of a date).
+   */
+  async getSupplierPaymentsForReport(params: {
+    organizationId: string;
+    branchId?: string | null;
+    asOfDate: string;
+  }): Promise<SupplierPaymentRecord[]> {
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        let query = supabase
+          .from('supplier_payments')
+          .select('*')
+          .eq('organization_id', params.organizationId)
+          .lte('payment_date', params.asOfDate)
+          .order('payment_date', { ascending: true });
+        if (params.branchId) query = query.eq('branch_id', params.branchId);
+        const { data, error } = await query;
+        if (!error && data) return data as SupplierPaymentRecord[];
+      } catch (err) {
+        console.warn('[purchasingService] Failed to load supplier payments:', err);
+      }
+      return [];
+    }
+    return localSupplierPayments.filter((p) => {
+      if (p.organization_id !== params.organizationId) return false;
+      if (params.branchId && p.branch_id !== params.branchId) return false;
+      return p.payment_date.slice(0, 10) <= params.asOfDate;
+    });
+  },
+
+  /**
+   * Reset mock stores (useful for tests)
+   */
+  _resetMockStore() {
+    localSupplierPayments = [
+      {
+        id: 'spay-00000000-0000-0000-0000-000000000001',
+        organization_id: '11111111-1111-1111-1111-111111111111',
+        branch_id: '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+        supplier_id: 's1111111-0000-0000-0000-000000000001',
+        goods_receipt_id: 'grn11111-0000-0000-0000-000000000001',
+        amount: 40.0,
+        payment_method: 'bank_transfer',
+        payment_date: new Date().toISOString().split('T')[0],
+        reference_number: 'NEFT-CDD-001',
+        notes: 'Part payment against GRN-2026-001',
+        idempotency_key: 'seed-supplier-payment-001',
+        created_by: null,
+        created_at: new Date().toISOString(),
+      },
+    ];
   },
 };

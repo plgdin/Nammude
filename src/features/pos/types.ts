@@ -9,6 +9,7 @@ export type OrderRecord = Database['public']['Tables']['orders']['Row'];
 export type OrderItemRecord = Database['public']['Tables']['order_items']['Row'];
 export type KotTicketRecord = Database['public']['Tables']['kot_tickets']['Row'];
 export type PaymentRecord = Database['public']['Tables']['payments']['Row'];
+export type PaymentRefundRecord = Database['public']['Tables']['payment_refunds']['Row'];
 
 export interface MenuItemWithModifiers extends MenuItemRecord {
   modifier_groups: {

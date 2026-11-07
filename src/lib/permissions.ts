@@ -107,6 +107,7 @@ export const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
   '/': PERMISSIONS.DASHBOARD,
   '/dashboard': PERMISSIONS.DASHBOARD,
   '/pos': PERMISSIONS.POS,
+  '/orders': PERMISSIONS.POS,
   '/kitchen': PERMISSIONS.KITCHEN,
   '/kds': PERMISSIONS.KITCHEN,
   '/inventory': PERMISSIONS.INVENTORY,

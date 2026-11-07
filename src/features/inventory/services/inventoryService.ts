@@ -144,6 +144,41 @@ export const inventoryService = {
   },
 
   /**
+   * Fetch stock movements for a financial report window (org-scoped, optional branch).
+   */
+  async getMovementsForReport(params: {
+    organizationId: string;
+    branchId?: string | null;
+    startDate: string;
+    endDate: string;
+  }): Promise<StockMovementRecord[]> {
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        let query = supabase
+          .from('stock_movements')
+          .select('*')
+          .eq('organization_id', params.organizationId)
+          .gte('created_at', `${params.startDate}T00:00:00.000Z`)
+          .lte('created_at', `${params.endDate}T23:59:59.999Z`)
+          .order('created_at', { ascending: true })
+          .limit(5000);
+        if (params.branchId) query = query.eq('branch_id', params.branchId);
+        const { data, error } = await query;
+        if (!error && data) return data as StockMovementRecord[];
+      } catch (err) {
+        console.warn('[inventoryService] Failed to load report movements:', err);
+      }
+      return [];
+    }
+    return localMovements.filter((m) => {
+      if (m.organization_id !== params.organizationId) return false;
+      if (params.branchId && m.branch_id !== params.branchId) return false;
+      const day = m.created_at.slice(0, 10);
+      return day >= params.startDate && day <= params.endDate;
+    });
+  },
+
+  /**
    * Record manual stock adjustment, wastage, or physical stock count
    */
   async recordAdjustment(params: {
