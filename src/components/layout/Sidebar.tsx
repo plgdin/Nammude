@@ -6,6 +6,7 @@ import { hasPermission, Permission, PERMISSIONS } from '@/lib/permissions';
 import {
   LayoutDashboard,
   UtensilsCrossed,
+  BookOpen,
   Boxes,
   CookingPot,
   ReceiptText,
@@ -35,6 +36,8 @@ const ALL_ROUTES: SidebarRoute[] = [
   { name: 'Dashboard', path: '/', icon: LayoutDashboard, permission: PERMISSIONS.DASHBOARD },
   { name: 'Point of Sale (POS)', path: '/pos', icon: UtensilsCrossed, permission: PERMISSIONS.POS },
   { name: 'Orders & Refunds', path: '/orders', icon: ClipboardList, permission: PERMISSIONS.POS },
+  { name: 'Menu Management', path: '/menu-admin', icon: BookOpen, permission: PERMISSIONS.MENU },
+  { name: 'Staff & Attendance', path: '/staff', icon: Users, permission: PERMISSIONS.STAFF },
   { name: 'Kitchen KDS', path: '/kitchen', icon: CookingPot, permission: PERMISSIONS.KITCHEN },
   { name: 'Inventory & Stock', path: '/inventory', icon: Boxes, permission: PERMISSIONS.INVENTORY },
   { name: 'Financials & Reports', path: '/financials', icon: ReceiptText, permission: PERMISSIONS.FINANCIALS },

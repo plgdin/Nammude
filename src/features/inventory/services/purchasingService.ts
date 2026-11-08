@@ -4,6 +4,8 @@ import {
   SupplierRecord,
   PurchaseOrderRecord,
   GoodsReceiptRecord,
+  SupplierInvoiceRecord,
+  ExpiringBatch,
 } from '../types';
 import { SupplierPaymentRecord } from '@/features/financials/types';
 
@@ -124,6 +126,24 @@ let localGoodsReceipts: GoodsReceiptRecord[] = [
         created_at: new Date().toISOString(),
       },
     ],
+  },
+];
+
+let localSupplierInvoices: SupplierInvoiceRecord[] = [
+  {
+    id: 'si-00000000-0000-0000-0000-000000000001',
+    organization_id: '11111111-1111-1111-1111-111111111111',
+    branch_id: '11111111-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    supplier_id: 's1111111-0000-0000-0000-000000000001',
+    goods_receipt_id: 'grn11111-0000-0000-0000-000000000001',
+    invoice_number: 'INV-CDD-98104',
+    invoice_date: new Date().toISOString().split('T')[0],
+    due_date: new Date(Date.now() + 86400000 * 15).toISOString().split('T')[0],
+    total_amount: 92.5,
+    status: 'verified',
+    notes: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   },
 ];
 
@@ -524,6 +544,287 @@ export const purchasingService = {
       if (params.branchId && p.branch_id !== params.branchId) return false;
       return p.payment_date.slice(0, 10) <= params.asOfDate;
     });
+  },
+
+  // --- Supplier invoices (first-class AP records) ---
+  async getSupplierInvoices(branchId: string): Promise<SupplierInvoiceRecord[]> {
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        const { data, error } = await (supabase.from('supplier_invoices') as any)
+          .select('*')
+          .eq('branch_id', branchId)
+          .order('invoice_date', { ascending: false });
+        if (!error && data) return data as SupplierInvoiceRecord[];
+      } catch (err) {
+        console.warn('[purchasingService] Failed to load supplier invoices:', err);
+      }
+      return [];
+    }
+    return localSupplierInvoices.filter((i) => i.branch_id === branchId);
+  },
+
+  async createSupplierInvoice(params: {
+    organizationId: string;
+    branchId: string;
+    supplierId: string;
+    invoiceNumber: string;
+    invoiceDate: string;
+    totalAmount: number;
+    goodsReceiptId?: string | null;
+    dueDate?: string | null;
+  }): Promise<{ success: boolean; invoice?: SupplierInvoiceRecord; error?: string }> {
+    const invoiceNumber = params.invoiceNumber.trim();
+    if (invoiceNumber.length < 2) return { success: false, error: 'Invoice number is required.' };
+    if (!Number.isFinite(params.totalAmount) || params.totalAmount < 0) {
+      return { success: false, error: 'Total amount must be zero or greater.' };
+    }
+
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        const { data, error } = await (supabase.from('supplier_invoices') as any)
+          .insert({
+            organization_id: params.organizationId,
+            branch_id: params.branchId,
+            supplier_id: params.supplierId,
+            goods_receipt_id: params.goodsReceiptId || null,
+            invoice_number: invoiceNumber,
+            invoice_date: params.invoiceDate,
+            due_date: params.dueDate || null,
+            total_amount: params.totalAmount,
+            status: 'received',
+          })
+          .select()
+          .single();
+        if (error) {
+          return {
+            success: false,
+            error: error.message.includes('uq_supplier_invoice_number')
+              ? 'An invoice with this number already exists for this supplier.'
+              : error.message,
+          };
+        }
+        return { success: true, invoice: data as SupplierInvoiceRecord };
+      } catch (err: any) {
+        return { success: false, error: err?.message || 'Failed to record supplier invoice.' };
+      }
+    }
+
+    const duplicate = localSupplierInvoices.find(
+      (i) =>
+        i.organization_id === params.organizationId &&
+        i.supplier_id === params.supplierId &&
+        i.invoice_number === invoiceNumber
+    );
+    if (duplicate) {
+      return { success: false, error: 'An invoice with this number already exists for this supplier.' };
+    }
+
+    const invoice: SupplierInvoiceRecord = {
+      id: `si-${Date.now()}`,
+      organization_id: params.organizationId,
+      branch_id: params.branchId,
+      supplier_id: params.supplierId,
+      goods_receipt_id: params.goodsReceiptId || null,
+      invoice_number: invoiceNumber,
+      invoice_date: params.invoiceDate,
+      due_date: params.dueDate || null,
+      total_amount: params.totalAmount,
+      status: 'received',
+      notes: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    localSupplierInvoices.unshift(invoice);
+    return { success: true, invoice };
+  },
+
+  async updateSupplierInvoiceStatus(
+    invoiceId: string,
+    status: SupplierInvoiceRecord['status']
+  ): Promise<{ success: boolean; error?: string }> {
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        const { error } = await (supabase.from('supplier_invoices') as any)
+          .update({ status, updated_at: new Date().toISOString() })
+          .eq('id', invoiceId);
+        if (error) return { success: false, error: error.message };
+        return { success: true };
+      } catch (err: any) {
+        return { success: false, error: err?.message || 'Failed to update invoice.' };
+      }
+    }
+    const target = localSupplierInvoices.find((i) => i.id === invoiceId);
+    if (!target) return { success: false, error: 'Invoice not found.' };
+    target.status = status;
+    target.updated_at = new Date().toISOString();
+    return { success: true };
+  },
+
+  // --- Supplier payments (AP disbursements) ---
+  async getSupplierPayments(branchId: string): Promise<SupplierPaymentRecord[]> {
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        const { data, error } = await (supabase.from('supplier_payments') as any)
+          .select('*')
+          .eq('branch_id', branchId)
+          .order('payment_date', { ascending: false });
+        if (!error && data) return data as SupplierPaymentRecord[];
+      } catch (err) {
+        console.warn('[purchasingService] Failed to load supplier payments:', err);
+      }
+      return [];
+    }
+    return localSupplierPayments.filter((p) => p.branch_id === branchId);
+  },
+
+  async recordSupplierPayment(params: {
+    organizationId: string;
+    branchId: string;
+    supplierId: string;
+    goodsReceiptId?: string | null;
+    invoiceId?: string | null;
+    amount: number;
+    paymentMethod: SupplierPaymentRecord['payment_method'];
+    paymentDate?: string;
+    referenceNumber?: string | null;
+    idempotencyKey?: string;
+  }): Promise<{ success: boolean; payment?: SupplierPaymentRecord; error?: string }> {
+    if (!Number.isFinite(params.amount) || params.amount <= 0) {
+      return { success: false, error: 'Payment amount must be greater than zero.' };
+    }
+    const paymentDate = params.paymentDate || new Date().toISOString().split('T')[0];
+
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        const { data, error } = await (supabase.from('supplier_payments') as any)
+          .insert({
+            organization_id: params.organizationId,
+            branch_id: params.branchId,
+            supplier_id: params.supplierId,
+            goods_receipt_id: params.goodsReceiptId || null,
+            amount: params.amount,
+            payment_method: params.paymentMethod,
+            payment_date: paymentDate,
+            reference_number: params.referenceNumber || null,
+            idempotency_key: params.idempotencyKey || null,
+          })
+          .select()
+          .single();
+        if (error) {
+          if (error.code === '23505') {
+            return { success: false, error: 'This payment was already recorded (duplicate idempotency key).' };
+          }
+          return { success: false, error: error.message };
+        }
+        const payment = data as SupplierPaymentRecord;
+        if (params.invoiceId) {
+          const paid = await this.getSupplierPayments(params.branchId);
+          const invoicePaid = paid
+            .filter((p) => p.goods_receipt_id === params.goodsReceiptId)
+            .reduce((sum, p) => sum + Number(p.amount), 0);
+          const invoice = localSupplierInvoices.find((i) => i.id === params.invoiceId);
+          const total = invoice?.total_amount ?? 0;
+          const newStatus =
+            total > 0 && invoicePaid >= total ? 'paid' : invoicePaid > 0 ? 'partially_paid' : 'received';
+          await this.updateSupplierInvoiceStatus(params.invoiceId, newStatus);
+        }
+        return { success: true, payment };
+      } catch (err: any) {
+        return { success: false, error: err?.message || 'Failed to record supplier payment.' };
+      }
+    }
+
+    if (params.idempotencyKey) {
+      const existing = localSupplierPayments.find((p) => p.idempotency_key === params.idempotencyKey);
+      if (existing) return { success: false, error: 'This payment was already recorded (duplicate idempotency key).' };
+    }
+
+    const payment: SupplierPaymentRecord = {
+      id: `spay-${Date.now()}`,
+      organization_id: params.organizationId,
+      branch_id: params.branchId,
+      supplier_id: params.supplierId,
+      goods_receipt_id: params.goodsReceiptId || null,
+      amount: params.amount,
+      payment_method: params.paymentMethod,
+      payment_date: paymentDate,
+      reference_number: params.referenceNumber || null,
+      notes: null,
+      idempotency_key: params.idempotencyKey || null,
+      created_by: null,
+      created_at: new Date().toISOString(),
+    };
+    localSupplierPayments.unshift(payment);
+
+    if (params.invoiceId) {
+      const invoice = localSupplierInvoices.find((i) => i.id === params.invoiceId);
+      if (invoice) {
+        const paid = localSupplierPayments
+          .filter((p) => p.goods_receipt_id === invoice.goods_receipt_id)
+          .reduce((sum, p) => sum + Number(p.amount), 0);
+        invoice.status =
+          invoice.total_amount > 0 && paid >= invoice.total_amount
+            ? 'paid'
+            : paid > 0
+              ? 'partially_paid'
+              : 'received';
+        invoice.updated_at = new Date().toISOString();
+      }
+    }
+
+    return { success: true, payment };
+  },
+
+  /**
+   * Batches expiring within the given window, from goods receipt line items.
+   */
+  async getExpiringBatches(branchId: string, withinDays = 7): Promise<ExpiringBatch[]> {
+    const cutoff = new Date(Date.now() + withinDays * 86400000).toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0];
+
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      try {
+        const { data, error } = await (supabase.from('goods_receipt_items') as any)
+          .select('ingredient_id, batch_number, expiry_date, received_quantity, purchase_unit, ingredients(name)')
+          .not('expiry_date', 'is', null)
+          .lte('expiry_date', cutoff)
+          .gte('expiry_date', today)
+          .limit(200);
+        if (!error && data) {
+          return (data as any[])
+            .filter((r) => r.expiry_date >= today)
+            .map((r) => ({
+              ingredient_id: r.ingredient_id,
+              ingredient_name: r.ingredients?.name || r.ingredient_id,
+              batch_number: r.batch_number,
+              expiry_date: r.expiry_date,
+              remaining_quantity: Number(r.received_quantity),
+              purchase_unit: r.purchase_unit,
+            }));
+        }
+      } catch (err) {
+        console.warn('[purchasingService] Failed to load expiring batches:', err);
+      }
+      return [];
+    }
+
+    const batches: ExpiringBatch[] = [];
+    for (const grn of localGoodsReceipts) {
+      if (grn.branch_id !== branchId) continue;
+      for (const item of grn.items || []) {
+        if (!item.expiry_date) continue;
+        if (item.expiry_date < today || item.expiry_date > cutoff) continue;
+        batches.push({
+          ingredient_id: item.ingredient_id,
+          ingredient_name: item.ingredient_name || item.ingredient_id,
+          batch_number: item.batch_number,
+          expiry_date: item.expiry_date,
+          remaining_quantity: item.received_quantity,
+          purchase_unit: item.purchase_unit,
+        });
+      }
+    }
+    return batches.sort((a, b) => a.expiry_date.localeCompare(b.expiry_date));
   },
 
   /**

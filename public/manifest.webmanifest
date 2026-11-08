@@ -1,0 +1,11 @@
+{
+  "name": "Nammude Restaurant OS",
+  "short_name": "Nammude",
+  "description": "Multi-tenant restaurant operating system: POS, kitchen, inventory, finance, and QR ordering.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0f1115",
+  "theme_color": "#2563eb",
+  "icons": []
+}

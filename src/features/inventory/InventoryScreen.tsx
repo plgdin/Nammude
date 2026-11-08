@@ -11,6 +11,7 @@ import { useOrganization } from '@/features/organization/OrganizationContext';
 import { inventoryService } from './services/inventoryService';
 import { RecipeManagementTab } from './components/RecipeManagementTab';
 import { PurchasingTab } from './components/PurchasingTab';
+import { CountsWasteTab } from './components/CountsWasteTab';
 import { IngredientRecord } from './types';
 import { formatCurrency } from '@/lib/currency';
 import { Card } from '@/components/ui/Card';
@@ -26,6 +27,7 @@ import {
   Boxes,
   ChefHat,
   Truck,
+  ClipboardList,
 } from 'lucide-react';
 
 export const InventoryScreen: React.FC = () => {
@@ -33,7 +35,7 @@ export const InventoryScreen: React.FC = () => {
   const { currentOrganization } = useOrganization();
 
   // Active Sub-Tab
-  const [activeTab, setActiveTab] = useState<'stock' | 'recipes' | 'purchasing'>('stock');
+  const [activeTab, setActiveTab] = useState<'stock' | 'recipes' | 'purchasing' | 'counts'>('stock');
 
   // State
   const [ingredients, setIngredients] = useState<InventoryIngredient[]>(initialIngredients);
@@ -263,6 +265,18 @@ export const InventoryScreen: React.FC = () => {
           <Truck className="w-4 h-4" />
           <span>Suppliers & Purchasing</span>
         </button>
+
+        <button
+          onClick={() => setActiveTab('counts')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-colors ${
+            activeTab === 'counts'
+              ? 'bg-amber-500 text-stone-950 shadow-sm'
+              : 'text-stone-400 hover:text-white hover:bg-surface-elevated'
+          }`}
+        >
+          <ClipboardList className="w-4 h-4" />
+          <span>Counts & Waste</span>
+        </button>
       </div>
 
       {/* Render Active Tab */}
@@ -272,6 +286,14 @@ export const InventoryScreen: React.FC = () => {
 
       {activeTab === 'purchasing' && (
         <PurchasingTab
+          organizationId={currentOrganization?.id || '11111111-1111-1111-1111-111111111111'}
+          branchId={selectedBranch.id}
+          ingredients={domainIngredients}
+        />
+      )}
+
+      {activeTab === 'counts' && (
+        <CountsWasteTab
           organizationId={currentOrganization?.id || '11111111-1111-1111-1111-111111111111'}
           branchId={selectedBranch.id}
           ingredients={domainIngredients}

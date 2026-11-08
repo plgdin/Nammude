@@ -180,6 +180,88 @@ export interface GoodsReceiptItemRecord {
   ingredient_name?: string;
 }
 
+export type WastageReasonCategory =
+  | 'spoiled'
+  | 'burnt'
+  | 'expired'
+  | 'spilled'
+  | 'damaged'
+  | 'other';
+
+export interface WastageRecord {
+  id: string;
+  organization_id: string;
+  branch_id: string;
+  ingredient_id: string;
+  quantity: number;
+  unit: string;
+  reason_category: WastageReasonCategory;
+  reason: string | null;
+  stock_movement_id: string | null;
+  recorded_by: string | null;
+  created_at: string;
+}
+
+export interface StockCountRecord {
+  id: string;
+  organization_id: string;
+  branch_id: string;
+  status: 'in_progress' | 'completed';
+  counted_by: string | null;
+  counted_at: string | null;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface StockCountItemRecord {
+  id: string;
+  organization_id: string;
+  stock_count_id: string;
+  ingredient_id: string;
+  system_quantity: number;
+  counted_quantity: number;
+  unit: string;
+  created_at: string;
+}
+
+export interface SupplierInvoiceRecord {
+  id: string;
+  organization_id: string;
+  branch_id: string;
+  supplier_id: string;
+  goods_receipt_id: string | null;
+  invoice_number: string;
+  invoice_date: string;
+  due_date: string | null;
+  total_amount: number;
+  status: 'received' | 'verified' | 'partially_paid' | 'paid' | 'disputed';
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ReorderSuggestion {
+  ingredient_id: string;
+  name: string;
+  current_stock: number;
+  reorder_level: number;
+  ideal_stock: number;
+  suggested_quantity: number;
+  unit: string;
+  supplier_id: string | null;
+  supplier_name: string | null;
+}
+
+export interface ExpiringBatch {
+  ingredient_id: string;
+  ingredient_name: string;
+  batch_number: string | null;
+  expiry_date: string;
+  remaining_quantity: number;
+  purchase_unit: string;
+}
+
 export interface GoodsReceiptRecord {
   id: string;
   organization_id: string;

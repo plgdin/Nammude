@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useOrganization } from '@/features/organization/OrganizationContext';
 import { kotService } from '@/features/pos/services/kotService';
 import { KotTicketRecord } from '@/features/pos/types';
+import { supabase } from '@/lib/supabase';
+import { env } from '@/lib/env';
 import { Button } from '@/components/ui/Button';
 import {
   CookingPot,
@@ -42,6 +44,40 @@ export const KitchenScreen: React.FC = () => {
   useEffect(() => {
     loadTickets();
   }, [currentBranch?.id, selectedStation]);
+
+  // Realtime updates: Supabase channel in live mode, polling in mock mode.
+  const loadRef = useRef(loadTickets);
+  loadRef.current = loadTickets;
+
+  useEffect(() => {
+    if (!currentBranch?.id) return;
+
+    if (env.isConfigured && !env.isMockAuthEnabled) {
+      const channel = supabase
+        .channel(`kot-${currentBranch.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'kot_tickets',
+            filter: `branch_id=eq.${currentBranch.id}`,
+          },
+          () => {
+            loadRef.current();
+          }
+        )
+        .subscribe();
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+
+    const interval = setInterval(() => {
+      loadRef.current();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [currentBranch?.id]);
 
   const handleAdvanceStatus = async (ticket: KotTicketRecord) => {
     let nextStatus: KotTicketRecord['status'] = 'in_progress';

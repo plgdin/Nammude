@@ -31,6 +31,26 @@ export interface PlatformOrganization {
   } | null;
 }
 
+export interface UsageRecord {
+  id: string;
+  organization_id: string;
+  period_start: string;
+  period_end: string;
+  metric: string;
+  quantity: number;
+  created_at: string;
+}
+
+export interface WebhookEvent {
+  id: string;
+  provider: string;
+  event_id: string;
+  event_type: string | null;
+  organization_id: string | null;
+  status: 'received' | 'processed' | 'failed';
+  received_at: string;
+}
+
 export interface PlatformAuditLog {
   id: string;
   actor_id: string | null;

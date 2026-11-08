@@ -14,8 +14,10 @@ export type MembershipRole =
   | 'general_manager'
   | 'branch_manager'
   | 'cashier'
+  | 'waiter'
   | 'kitchen'
   | 'inventory'
+  | 'operations'
   | 'auditor';
 export type MembershipStatus = 'active' | 'invited' | 'suspended' | 'revoked';
 

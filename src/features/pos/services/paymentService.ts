@@ -69,14 +69,24 @@ export const paymentService = {
           return { success: false, payment_id: '', error: error.message };
         }
 
-        // Also update order status to completed and paid_amount
-        await (supabase.from('orders') as any)
-          .update({
-            status: 'completed',
-            paid_amount: payload.amount,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', payload.order_id);
+        // Accumulate paid amount; complete the order only when fully paid.
+        const { data: orderRow } = await supabase
+          .from('orders')
+          .select('paid_amount,total_amount,status')
+          .eq('id', payload.order_id)
+          .maybeSingle();
+        if (orderRow) {
+          const paidSoFar = Number((orderRow as any).paid_amount || 0);
+          const newPaid = Number((paidSoFar + payload.amount).toFixed(2));
+          const fullyPaid = newPaid >= Number((orderRow as any).total_amount) - 0.005;
+          await (supabase.from('orders') as any)
+            .update({
+              status: fullyPaid ? 'completed' : (orderRow as any).status,
+              paid_amount: newPaid,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', payload.order_id);
+        }
 
         return { success: true, payment_id: data?.id || '' };
       } catch (err: any) {
@@ -102,6 +112,11 @@ export const paymentService = {
     };
 
     mockPaymentsStore.push(newPayment);
+
+    // Accumulate paid amount on the order; complete only when fully paid.
+    const { orderService } = await import('./orderService');
+    await orderService.recordPaidAmount(payload.order_id, payload.amount);
+
     return { success: true, payment_id: paymentId };
   },
 

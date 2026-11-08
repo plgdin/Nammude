@@ -21,7 +21,9 @@ export const PlatformAdminScreen: React.FC = () => {
   const [organizations, setOrganizations] = useState<PlatformOrganization[]>([]);
   const [auditLogs, setAuditLogs] = useState<PlatformAuditLog[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
-  const [activeTab, setActiveTab] = useState<'organizations' | 'logs'>('organizations');
+  const [activeTab, setActiveTab] = useState<'organizations' | 'logs' | 'usage'>('organizations');
+  const [usageRecords, setUsageRecords] = useState<import('./types').UsageRecord[]>([]);
+  const [webhookEvents, setWebhookEvents] = useState<import('./types').WebhookEvent[]>([]);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [actionModal, setActionModal] = useState<{
@@ -37,14 +39,18 @@ export const PlatformAdminScreen: React.FC = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [m, orgs, logs] = await Promise.all([
+      const [m, orgs, logs, usage, webhooks] = await Promise.all([
         platformAdminService.getMetrics(),
         platformAdminService.getOrganizations(),
         platformAdminService.getAuditLogs(),
+        platformAdminService.getUsageRecords(),
+        platformAdminService.getWebhookEvents(),
       ]);
       setMetrics(m);
       setOrganizations(orgs);
       setAuditLogs(logs);
+      setUsageRecords(usage);
+      setWebhookEvents(webhooks);
     } catch (err: any) {
       setNotification({ message: err?.message || 'Failed to load platform data', type: 'error' });
     } finally {
@@ -231,6 +237,16 @@ export const PlatformAdminScreen: React.FC = () => {
           }`}
         >
           Administrative Audit Log ({auditLogs.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('usage')}
+          className={`pb-3 px-2 border-b-2 transition ${
+            activeTab === 'usage'
+              ? 'border-indigo-500 text-indigo-400'
+              : 'border-transparent text-slate-400 hover:text-slate-200'
+          }`}
+        >
+          Usage & Webhooks ({usageRecords.length})
         </button>
       </div>
 
@@ -459,6 +475,66 @@ export const PlatformAdminScreen: React.FC = () => {
               >
                 {actionLoading ? 'Processing...' : 'Confirm Action'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tab: Usage & Webhooks */}
+      {activeTab === 'usage' && (
+        <div className="space-y-6">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg p-5">
+            <h3 className="text-base font-bold text-white mb-4">Metered Usage (Plan Enforcement Source)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="text-slate-500">
+                  <tr>
+                    <th className="py-2 font-medium">Tenant</th>
+                    <th className="py-2 font-medium">Period</th>
+                    <th className="py-2 font-medium">Metric</th>
+                    <th className="py-2 font-medium text-right">Quantity</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {usageRecords.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-500">No usage records yet.</td>
+                    </tr>
+                  )}
+                  {usageRecords.map((u) => (
+                    <tr key={u.id} className="text-slate-300">
+                      <td className="py-3 font-mono">{u.organization_id.slice(0, 8)}...</td>
+                      <td className="py-3">{u.period_start} → {u.period_end}</td>
+                      <td className="py-3 capitalize">{u.metric.replace(/_/g, ' ')}</td>
+                      <td className="py-3 text-right font-bold text-white">{u.quantity.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-lg p-5">
+            <h3 className="text-base font-bold text-white mb-4">Billing Webhook Events</h3>
+            <div className="space-y-3">
+              {webhookEvents.length === 0 && (
+                <p className="text-xs text-slate-500">No webhook events received yet. Configure the payment provider webhook endpoint to populate this feed.</p>
+              )}
+              {webhookEvents.map((w) => (
+                <div key={w.id} className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs">
+                  <div>
+                    <span className="font-semibold text-indigo-300 font-mono">{w.provider}</span>
+                    <span className="text-slate-400 ml-2">{w.event_type || '—'}</span>
+                    <div className="text-slate-500 mt-1 font-mono">{w.event_id}</div>
+                  </div>
+                  <span className={`px-2 py-0.5 rounded-full font-semibold ${
+                    w.status === 'processed' ? 'bg-emerald-950/70 text-emerald-400' :
+                    w.status === 'failed' ? 'bg-rose-950/70 text-rose-400' : 'bg-amber-950/70 text-amber-400'
+                  }`}>
+                    {w.status}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
         </div>

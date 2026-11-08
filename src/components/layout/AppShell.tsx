@@ -27,6 +27,16 @@ export const AppShell: React.FC = () => {
           title: 'Orders & Refunds',
           subtitle: `${currentBranch?.name || 'Main Branch'} • Order search, corrections & auditable refunds`,
         };
+      case '/menu-admin':
+        return {
+          title: 'Menu Management',
+          subtitle: `${currentOrganization?.name || 'Restaurant'} • Categories, items, pricing & modifiers`,
+        };
+      case '/staff':
+        return {
+          title: 'Staff & Attendance',
+          subtitle: `${currentBranch?.name || 'Main Branch'} • Roster, shifts & clock in/out`,
+        };
       case '/inventory':
         return {
           title: 'Stock & Ingredients',

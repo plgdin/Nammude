@@ -45,12 +45,35 @@ export const PosScreen: React.FC = () => {
   // Active View & Filter State
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway'>('dine_in');
+  const [orderType, setOrderType] = useState<'dine_in' | 'takeaway' | 'delivery'>('dine_in');
   const [selectedTable, setSelectedTable] = useState<string>('T-01');
+  const [deliveryAddress, setDeliveryAddress] = useState<string>('');
   const [cart, setCart] = useState<CartLineItem[]>([]);
   const [discountPercent, setDiscountPercent] = useState<number>(0);
   const [isSubmittingOrder, setIsSubmittingOrder] = useState<boolean>(false);
   const [orderSuccessBanner, setOrderSuccessBanner] = useState<string | null>(null);
+  const [receiptItems, setReceiptItems] = useState<{ name: string; quantity: number; lineTotal: number }[]>([]);
+  const [lastOrderTotal, setLastOrderTotal] = useState<number>(0);
+
+  // Held carts (hold/resume) persisted per branch
+  const [heldCarts, setHeldCarts] = useState<
+    { id: string; label: string; cart: CartLineItem[]; discountPercent: number; orderType: typeof orderType; created_at: string }[]
+  >(() => {
+    try {
+      const saved = localStorage.getItem(`pos_held_carts_${activeBranch?.id || 'default'}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(`pos_held_carts_${activeBranch?.id || 'default'}`, JSON.stringify(heldCarts));
+    } catch {
+      // storage unavailable — held carts are session-only
+    }
+  }, [heldCarts, activeBranch?.id]);
 
   // Modals
   const [modifierItem, setModifierItem] = useState<MenuItemWithModifiers | null>(null);
@@ -199,9 +222,46 @@ export const PosScreen: React.FC = () => {
   const taxAmount = roundMoney(taxableAmount * taxRate);
   const totalAmount = roundMoney(taxableAmount + taxAmount);
 
+  // Hold / resume carts
+  const handleHoldCart = () => {
+    if (cart.length === 0) return;
+    const held = {
+      id: `held-${Date.now()}`,
+      label: `Held ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • ${cart.length} item(s) • ${formatCurrency(totalAmount)}`,
+      cart,
+      discountPercent,
+      orderType,
+      created_at: new Date().toISOString(),
+    };
+    setHeldCarts((prev) => [held, ...prev]);
+    clearCart();
+    setOrderSuccessBanner('Order held. Resume it anytime from the held orders list.');
+  };
+
+  const handleResumeCart = (heldId: string) => {
+    const held = heldCarts.find((h) => h.id === heldId);
+    if (!held) return;
+    if (cart.length > 0) {
+      setError('Current cart is not empty. Send or clear it before resuming a held order.');
+      return;
+    }
+    setCart(held.cart);
+    setDiscountPercent(held.discountPercent);
+    setOrderType(held.orderType);
+    setHeldCarts((prev) => prev.filter((h) => h.id !== heldId));
+  };
+
+  const handleDeleteHeld = (heldId: string) => {
+    setHeldCarts((prev) => prev.filter((h) => h.id !== heldId));
+  };
+
   // Submit Order & Dispatch KOT
   const handlePlaceOrder = async () => {
     if (cart.length === 0 || !currentOrganization || !activeBranch) return;
+    if (orderType === 'delivery' && deliveryAddress.trim().length < 8) {
+      setError('Enter the delivery address (at least 8 characters).');
+      return;
+    }
 
     setIsSubmittingOrder(true);
     setOrderSuccessBanner(null);
@@ -216,6 +276,7 @@ export const PosScreen: React.FC = () => {
       table_id: orderType === 'dine_in' ? targetTable?.id : null,
       guest_count: 2,
       discount_percent: discountPercent,
+      notes: orderType === 'delivery' ? `Delivery: ${deliveryAddress.trim()}` : undefined,
       idempotency_key: idempotencyKey,
       items: cart.map((line) => ({
         menu_item_id: line.menu_item.id,
@@ -230,6 +291,14 @@ export const PosScreen: React.FC = () => {
     if (res.success) {
       setActiveOrderId(res.order_id);
       setActiveOrderNum(res.order_number);
+      setReceiptItems(
+        cart.map((line) => ({
+          name: line.menu_item.name,
+          quantity: line.quantity,
+          lineTotal: line.line_subtotal,
+        }))
+      );
+      setLastOrderTotal(totalAmount);
       setOrderSuccessBanner(`Order ${res.order_number} confirmed! Dispatched to Kitchen (${res.kot_number || 'KOT'}).`);
       setIsPaymentOpen(true);
       clearCart();
@@ -258,7 +327,7 @@ export const PosScreen: React.FC = () => {
 
           {/* Order Type Toggle */}
           <div className="flex rounded-xl bg-surface-elevated p-1 border border-surface-border">
-            {(['dine_in', 'takeaway'] as const).map((type) => (
+            {(['dine_in', 'takeaway', 'delivery'] as const).map((type) => (
               <button
                 key={type}
                 type="button"
@@ -273,6 +342,17 @@ export const PosScreen: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {/* Delivery Address (for Delivery orders) */}
+          {orderType === 'delivery' && (
+            <input
+              type="text"
+              value={deliveryAddress}
+              onChange={(e) => setDeliveryAddress(e.target.value)}
+              placeholder="Delivery address..."
+              className="w-full min-w-[200px] rounded-xl border border-surface-border bg-surface-elevated px-3 py-2 text-xs text-white placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-brand"
+            />
+          )}
 
           {/* Table Selector & QR Trigger (for Dine-In) */}
           {orderType === 'dine_in' && tables.length > 0 && (
@@ -430,16 +510,57 @@ export const PosScreen: React.FC = () => {
             <span className="text-xs text-gray-400 font-mono">({cart.length})</span>
           </div>
 
-          {cart.length > 0 && (
-            <button
-              type="button"
-              onClick={clearCart}
-              className="text-[11px] text-gray-400 hover:text-red-400 transition-colors"
-            >
-              Clear Cart
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {cart.length > 0 && (
+              <>
+                <button
+                  type="button"
+                  onClick={handleHoldCart}
+                  className="text-[11px] text-gray-400 hover:text-white transition-colors"
+                >
+                  Hold
+                </button>
+                <button
+                  type="button"
+                  onClick={clearCart}
+                  className="text-[11px] text-gray-400 hover:text-red-400 transition-colors"
+                >
+                  Clear Cart
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        {/* Held Orders */}
+        {heldCarts.length > 0 && (
+          <div className="border-b border-surface-border bg-surface px-4 py-2.5 space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+              Held Orders ({heldCarts.length})
+            </p>
+            {heldCarts.map((held) => (
+              <div key={held.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="text-gray-300 truncate">{held.label}</span>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleResumeCart(held.id)}
+                    className="rounded-lg bg-brand px-2 py-1 text-[10px] font-bold text-brand-fg"
+                  >
+                    Resume
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteHeld(held.id)}
+                    className="text-gray-500 hover:text-red-400 transition-colors p-1"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Cart Items List */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -595,10 +716,11 @@ export const PosScreen: React.FC = () => {
         isOpen={isPaymentOpen}
         onClose={() => setIsPaymentOpen(false)}
         orderId={activeOrderId}
-        totalPayable={totalAmount}
+        totalPayable={lastOrderTotal}
         orderNumber={activeOrderNum}
         orderType={orderType}
         tableNumber={orderType === 'dine_in' ? selectedTable : ''}
+        receiptItems={receiptItems}
         onPaymentSuccess={(_method, _tender, _change) => {
           setIsPaymentOpen(false);
           setOrderSuccessBanner(`Order ${activeOrderNum} settled successfully.`);

@@ -292,6 +292,52 @@ export const orderService = {
   },
 
   /**
+   * Accumulate a payment toward an order (split/partial payments).
+   * Marks the order completed only when fully paid.
+   */
+  async recordPaidAmount(
+    orderId: string,
+    amount: number,
+    totalAmount?: number
+  ): Promise<{ success: boolean; paid_amount: number; fully_paid: boolean }> {
+    const live = env.isConfigured && !env.isMockAuthEnabled;
+    let order: OrderRecord | null = null;
+
+    if (live) {
+      const { data } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', orderId)
+        .maybeSingle();
+      order = (data as OrderRecord | null) || null;
+    } else {
+      order = mockOrdersStore.find((o) => o.id === orderId) || null;
+    }
+
+    if (!order) return { success: false, paid_amount: 0, fully_paid: false };
+
+    const total = totalAmount ?? Number(order.total_amount);
+    const newPaid = Number((Number(order.paid_amount) + amount).toFixed(2));
+    const fullyPaid = newPaid >= total - 0.005;
+
+    if (live) {
+      const { error } = await (supabase.from('orders') as any)
+        .update({
+          paid_amount: newPaid,
+          status: fullyPaid ? 'completed' : order.status,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+      return { success: !error, paid_amount: newPaid, fully_paid: fullyPaid };
+    }
+
+    order.paid_amount = newPaid;
+    if (fullyPaid) order.status = 'completed';
+    order.updated_at = new Date().toISOString();
+    return { success: true, paid_amount: newPaid, fully_paid: fullyPaid };
+  },
+
+  /**
    * Update order status
    */
   async updateOrderStatus(orderId: string, status: OrderRecord['status']): Promise<boolean> {

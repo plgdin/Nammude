@@ -19,8 +19,9 @@ import { formatCurrency } from '@/lib/currency';
 import { useOrganization } from '@/features/organization/OrganizationContext';
 import { crmService } from './services/crmService';
 import { loyaltyService } from '@/features/loyalty/services/loyaltyService';
-import { Customer } from './types';
+import { Customer, FeedbackRecord, PromotionRecord } from './types';
 import { LoyaltyConfig, LoyaltyLedgerEntry } from '@/features/loyalty/types';
+import { MessageSquareText, ShieldCheck, TicketPercent } from 'lucide-react';
 
 export const CustomersScreen: React.FC = () => {
   const { currentOrganization } = useOrganization();
@@ -50,21 +51,40 @@ export const CustomersScreen: React.FC = () => {
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [customerLedger, setCustomerLedger] = useState<LoyaltyLedgerEntry[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState<boolean>(false);
+  const [customerConsents, setCustomerConsents] = useState<Record<string, boolean>>({});
 
   // Loyalty Config Modal
   const [configModalOpen, setConfigModalOpen] = useState<boolean>(false);
   const [configForm, setConfigForm] = useState<Partial<LoyaltyConfig>>({});
 
+  // Feedback / Promotions (CRM extras)
+  const [feedback, setFeedback] = useState<FeedbackRecord[]>([]);
+  const [promotions, setPromotions] = useState<PromotionRecord[]>([]);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState<boolean>(false);
+  const [feedbackRating, setFeedbackRating] = useState<string>('');
+  const [feedbackComment, setFeedbackComment] = useState<string>('');
+  const [promoModalOpen, setPromoModalOpen] = useState<boolean>(false);
+  const [promoName, setPromoName] = useState<string>('');
+  const [promoCode, setPromoCode] = useState<string>('');
+  const [promoType, setPromoType] = useState<'percent' | 'fixed'>('percent');
+  const [promoValue, setPromoValue] = useState<string>('');
+  const [promoMinOrder, setPromoMinOrder] = useState<string>('');
+  const [extrasError, setExtrasError] = useState<string | null>(null);
+
   const loadData = async () => {
     setLoading(true);
     try {
-      const [custs, cfg] = await Promise.all([
+      const [custs, cfg, fb, promos] = await Promise.all([
         crmService.getCustomers(orgId, { search, tag: selectedTag, sortBy }),
         loyaltyService.getLoyaltyConfig(orgId),
+        crmService.getFeedback(orgId),
+        crmService.getPromotions(orgId),
       ]);
       setCustomers(custs);
       setLoyaltyConfig(cfg);
       setConfigForm(cfg);
+      setFeedback(fb);
+      setPromotions(promos);
     } finally {
       setLoading(false);
     }
@@ -132,11 +152,29 @@ export const CustomersScreen: React.FC = () => {
     setSelectedCustomer(c);
     setLedgerLoading(true);
     try {
-      const entries = await loyaltyService.getLedger(orgId, c.id);
+      const [entries, consents] = await Promise.all([
+        loyaltyService.getLedger(orgId, c.id),
+        crmService.getConsents(orgId, c.id),
+      ]);
       setCustomerLedger(entries);
+      setCustomerConsents(
+        Object.fromEntries(consents.map((con) => [con.consent_type, con.granted]))
+      );
     } finally {
       setLedgerLoading(false);
     }
+  };
+
+  const handleToggleConsent = async (consentType: 'marketing_email' | 'marketing_sms' | 'loyalty', granted: boolean) => {
+    if (!selectedCustomer) return;
+    await crmService.setConsent({
+      organizationId: orgId,
+      customerId: selectedCustomer.id,
+      consentType,
+      granted,
+      source: 'crm_profile',
+    });
+    setCustomerConsents((prev) => ({ ...prev, [consentType]: granted }));
   };
 
   const handleSaveLoyaltyConfig = async (e: React.FormEvent) => {
@@ -367,6 +405,281 @@ export const CustomersScreen: React.FC = () => {
         </div>
       </div>
 
+      {/* Feedback, Consent & Promotions */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <MessageSquareText className="w-5 h-5 text-amber-400" />
+              Guest Feedback ({feedback.length})
+            </h3>
+            <button
+              onClick={() => { setExtrasError(null); setFeedbackModalOpen(true); }}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition"
+            >
+              + Record Feedback
+            </button>
+          </div>
+          <div className="space-y-3">
+            {feedback.length === 0 && (
+              <p className="text-xs text-slate-500">No feedback recorded yet.</p>
+            )}
+            {feedback.slice(0, 5).map((f) => (
+              <div key={f.id} className="flex items-start justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs">
+                <div>
+                  <div className="flex items-center gap-2">
+                    {f.rating !== null && (
+                      <span className="inline-flex items-center gap-1 text-amber-400 font-semibold">
+                        <Star className="w-3.5 h-3.5" /> {f.rating}/5
+                      </span>
+                    )}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold ${
+                      f.status === 'resolved' ? 'bg-emerald-950/70 text-emerald-400' :
+                      f.status === 'acknowledged' ? 'bg-blue-950/70 text-blue-400' : 'bg-amber-950/70 text-amber-400'
+                    }`}>
+                      {f.status}
+                    </span>
+                  </div>
+                  <p className="text-slate-300 mt-1">{f.comment}</p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    {new Date(f.created_at).toLocaleDateString()} • {f.channel}
+                  </p>
+                </div>
+                {f.status !== 'resolved' && (
+                  <button
+                    onClick={async () => {
+                      await crmService.updateFeedbackStatus(f.id, f.status === 'new' ? 'acknowledged' : 'resolved');
+                      await loadData();
+                    }}
+                    className="shrink-0 px-2 py-1 rounded-lg bg-slate-800 text-slate-300 hover:text-white text-[10px] font-semibold"
+                  >
+                    {f.status === 'new' ? 'Acknowledge' : 'Resolve'}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <TicketPercent className="w-5 h-5 text-indigo-400" />
+              Promotions ({promotions.length})
+            </h3>
+            <button
+              onClick={() => { setExtrasError(null); setPromoModalOpen(true); }}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition"
+            >
+              + New Promotion
+            </button>
+          </div>
+          <div className="space-y-3">
+            {promotions.length === 0 && (
+              <p className="text-xs text-slate-500">No promotions yet. Create a promo code for festive offers.</p>
+            )}
+            {promotions.map((p) => (
+              <div key={p.id} className="flex items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2.5 text-xs">
+                <div>
+                  <p className="font-bold text-white">{p.name} <span className="font-mono text-indigo-300">({p.code})</span></p>
+                  <p className="text-slate-500">
+                    {p.discount_type === 'percent' ? `${p.discount_value}% off` : `${formatCurrency(p.discount_value)} off`}
+                    {p.min_order_value > 0 ? ` • Min order ${formatCurrency(p.min_order_value)}` : ''}
+                    {p.usage_limit ? ` • ${p.used_count}/${p.usage_limit} used` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    await crmService.togglePromotion(p.id, !p.is_active);
+                    await loadData();
+                  }}
+                  className={`shrink-0 px-2 py-1 rounded-lg text-[10px] font-semibold ${
+                    p.is_active ? 'bg-emerald-950/70 text-emerald-400' : 'bg-slate-800 text-slate-400'
+                  }`}
+                >
+                  {p.is_active ? 'Active' : 'Paused'}
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-800">
+            <h4 className="text-xs font-bold text-slate-300 flex items-center gap-2 mb-2">
+              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+              Marketing Consent (per customer, from profile)
+            </h4>
+            <p className="text-[11px] text-slate-500">
+              Consent flags are managed on each customer profile and recorded with source + timestamp.
+              Customers who have not opted in will not receive marketing messages.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Feedback Modal */}
+      {feedbackModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setExtrasError(null);
+              const result = await crmService.createFeedback({
+                organizationId: orgId,
+                rating: feedbackRating ? Number(feedbackRating) : null,
+                comment: feedbackComment,
+              });
+              if (!result.success) {
+                setExtrasError(result.error || 'Unable to record feedback.');
+                return;
+              }
+              setFeedbackModalOpen(false);
+              setFeedbackRating('');
+              setFeedbackComment('');
+              await loadData();
+            }}
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+          >
+            <h3 className="text-lg font-bold text-white">Record Guest Feedback</h3>
+            {extrasError && (
+              <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800/60 text-xs text-rose-300">
+                {extrasError}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Rating (1–5, optional)</label>
+              <select
+                value={feedbackRating}
+                onChange={(e) => setFeedbackRating(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">No rating</option>
+                {[5, 4, 3, 2, 1].map((r) => (
+                  <option key={r} value={r}>{r} star{r > 1 ? 's' : ''}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Comment</label>
+              <textarea
+                value={feedbackComment}
+                onChange={(e) => setFeedbackComment(e.target.value)}
+                placeholder="What did the guest say?"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500 h-20"
+              />
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setFeedbackModalOpen(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-white">
+                Cancel
+              </button>
+              <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition">
+                Record Feedback
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Promotion Modal */}
+      {promoModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <form
+            onSubmit={async (e) => {
+              e.preventDefault();
+              setExtrasError(null);
+              const result = await crmService.createPromotion({
+                organizationId: orgId,
+                name: promoName,
+                code: promoCode,
+                discountType: promoType,
+                discountValue: Number(promoValue),
+                minOrderValue: Number(promoMinOrder) || 0,
+              });
+              if (!result.success) {
+                setExtrasError(result.error || 'Unable to create promotion.');
+                return;
+              }
+              setPromoModalOpen(false);
+              setPromoName('');
+              setPromoCode('');
+              setPromoValue('');
+              setPromoMinOrder('');
+              await loadData();
+            }}
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md w-full shadow-2xl space-y-4"
+          >
+            <h3 className="text-lg font-bold text-white">New Promotion</h3>
+            {extrasError && (
+              <div className="p-2.5 rounded-lg bg-rose-950/60 border border-rose-800/60 text-xs text-rose-300">
+                {extrasError}
+              </div>
+            )}
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Name</label>
+              <input
+                value={promoName}
+                onChange={(e) => setPromoName(e.target.value)}
+                placeholder="Festive Feast Offer"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Promo code</label>
+              <input
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                placeholder="FEST20"
+                className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm font-mono focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Type</label>
+                <select
+                  value={promoType}
+                  onChange={(e) => setPromoType(e.target.value as 'percent' | 'fixed')}
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="percent">Percent</option>
+                  <option value="fixed">Fixed ₹</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Value</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={promoValue}
+                  onChange={(e) => setPromoValue(e.target.value)}
+                  placeholder="20"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-400 uppercase mb-1">Min order ₹</label>
+                <input
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={promoMinOrder}
+                  onChange={(e) => setPromoMinOrder(e.target.value)}
+                  placeholder="0"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-slate-200 text-sm focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={() => setPromoModalOpen(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-white">
+                Cancel
+              </button>
+              <button type="submit" className="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-sm font-semibold transition">
+                Create Promotion
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
       {/* Customer Create/Edit Modal */}
       {customerModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
@@ -486,6 +799,34 @@ export const CustomersScreen: React.FC = () => {
               >
                 <X className="w-5 h-5" />
               </button>
+            </div>
+
+            {/* Marketing Consent */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-slate-300 uppercase flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                Marketing Consent
+              </h4>
+              {(
+                [
+                  ['marketing_email', 'Email offers'],
+                  ['marketing_sms', 'SMS offers'],
+                  ['loyalty', 'Loyalty programme'],
+                ] as const
+              ).map(([type, label]) => (
+                <label key={type} className="flex items-center justify-between text-xs text-slate-300">
+                  <span>{label}</span>
+                  <input
+                    type="checkbox"
+                    checked={customerConsents[type] ?? false}
+                    onChange={(e) => handleToggleConsent(type, e.target.checked)}
+                    className="w-4 h-4 rounded text-indigo-600 focus:ring-0"
+                  />
+                </label>
+              ))}
+              <p className="text-[11px] text-slate-500">
+                Consent is recorded with source + timestamp. Unchecked means no marketing contact.
+              </p>
             </div>            <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
               {ledgerLoading ? (
                 <div className="text-center py-6 text-slate-400 text-xs">

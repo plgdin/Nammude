@@ -13,8 +13,10 @@ export const PERMISSIONS = {
   DOCUMENTS: 'documents',
   CHECKLISTS: 'checklists',
   CUSTOMERS: 'customers',
+  MENU: 'menu',
   ONBOARDING: 'onboarding',
   SETTINGS: 'settings',
+  STAFF: 'staff',
   PLATFORM_ADMIN: 'platform_admin',
 } as const;
 
@@ -35,8 +37,10 @@ const ROLE_PERMISSIONS: Record<MembershipRole, readonly Permission[] | '*'> = {
     PERMISSIONS.DOCUMENTS,
     PERMISSIONS.CHECKLISTS,
     PERMISSIONS.CUSTOMERS,
+    PERMISSIONS.MENU,
     PERMISSIONS.ONBOARDING,
     PERMISSIONS.SETTINGS,
+    PERMISSIONS.STAFF,
   ],
   general_manager: [
     PERMISSIONS.DASHBOARD,
@@ -47,7 +51,9 @@ const ROLE_PERMISSIONS: Record<MembershipRole, readonly Permission[] | '*'> = {
     PERMISSIONS.DOCUMENTS,
     PERMISSIONS.CHECKLISTS,
     PERMISSIONS.CUSTOMERS,
+    PERMISSIONS.MENU,
     PERMISSIONS.SETTINGS,
+    PERMISSIONS.STAFF,
   ],
   branch_manager: [
     PERMISSIONS.DASHBOARD,
@@ -57,8 +63,13 @@ const ROLE_PERMISSIONS: Record<MembershipRole, readonly Permission[] | '*'> = {
     PERMISSIONS.FINANCIALS,
     PERMISSIONS.CHECKLISTS,
     PERMISSIONS.CUSTOMERS,
+    PERMISSIONS.STAFF,
   ],
   cashier: [
+    PERMISSIONS.DASHBOARD,
+    PERMISSIONS.POS,
+  ],
+  waiter: [
     PERMISSIONS.DASHBOARD,
     PERMISSIONS.POS,
   ],
@@ -69,6 +80,11 @@ const ROLE_PERMISSIONS: Record<MembershipRole, readonly Permission[] | '*'> = {
   inventory: [
     PERMISSIONS.DASHBOARD,
     PERMISSIONS.INVENTORY,
+  ],
+  operations: [
+    PERMISSIONS.DASHBOARD,
+    PERMISSIONS.CHECKLISTS,
+    PERMISSIONS.STAFF,
   ],
   auditor: [
     PERMISSIONS.DASHBOARD,
@@ -118,8 +134,10 @@ export const ROUTE_PERMISSION_MAP: Record<string, Permission> = {
   '/checklists': PERMISSIONS.CHECKLISTS,
   '/customers': PERMISSIONS.CUSTOMERS,
   '/crm': PERMISSIONS.CUSTOMERS,
+  '/menu-admin': PERMISSIONS.MENU,
   '/onboarding': PERMISSIONS.ONBOARDING,
   '/settings': PERMISSIONS.SETTINGS,
+  '/staff': PERMISSIONS.STAFF,
   '/platform-admin': PERMISSIONS.PLATFORM_ADMIN,
 };
 
@@ -132,6 +150,10 @@ export function getDefaultRouteForRole(role: MembershipRole): string {
       return '/platform-admin';
     case 'cashier':
       return '/pos';
+    case 'waiter':
+      return '/pos';
+    case 'operations':
+      return '/checklists';
     case 'kitchen':
       return '/kitchen';
     case 'inventory':

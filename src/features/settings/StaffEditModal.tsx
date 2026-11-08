@@ -23,8 +23,10 @@ const ROLES: Array<{ value: RoleType; label: string; desc: string }> = [
   { value: 'general_manager', label: 'General Manager', desc: 'All operations except restaurant onboarding' },
   { value: 'branch_manager', label: 'Branch Manager', desc: 'POS, Kitchen, Inventory, Financials, Checklists' },
   { value: 'cashier', label: 'Cashier', desc: 'Dashboard & POS terminal ordering only' },
+  { value: 'waiter', label: 'Waiter / Front-of-House', desc: 'Floor tables, orders & KOT dispatch' },
   { value: 'kitchen', label: 'Kitchen Staff', desc: 'Kitchen KDS screen view only' },
   { value: 'inventory', label: 'Inventory Staff', desc: 'Stock levels, purchase orders & recipes' },
+  { value: 'operations', label: 'Cleaning / Operations', desc: 'Assigned duties & checklist completion' },
   { value: 'auditor', label: 'Auditor', desc: 'Financial reports, P&L, and OCR receipts' },
 ];
 

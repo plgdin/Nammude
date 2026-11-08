@@ -13,3 +13,12 @@ ReactDOM.createRoot(rootElement).render(
     <App />
   </React.StrictMode>
 );
+
+// PWA app-shell caching (production only — never in dev where HMR is active).
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {
+      // Offline shell is a progressive enhancement; failures are non-fatal.
+    });
+  });
+}

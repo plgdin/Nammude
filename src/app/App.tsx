@@ -21,6 +21,16 @@ const OrdersScreen = lazy(() =>
     default: m.OrdersScreen,
   }))
 );
+const StaffScreen = lazy(() =>
+  import('@/features/staff/StaffScreen').then((m) => ({
+    default: m.StaffScreen,
+  }))
+);
+const MenuScreen = lazy(() =>
+  import('@/features/pos/MenuScreen').then((m) => ({
+    default: m.MenuScreen,
+  }))
+);
 const InventoryScreen = lazy(() =>
   import('@/features/inventory/InventoryScreen').then((m) => ({
     default: m.InventoryScreen,
@@ -151,6 +161,22 @@ export const App: React.FC = () => {
                 element={
                   <Suspense fallback={<RouteLoadingFallback />}>
                     <OrdersScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/staff"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <StaffScreen />
+                  </Suspense>
+                }
+              />
+              <Route
+                path="/menu-admin"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <MenuScreen />
                   </Suspense>
                 }
               />

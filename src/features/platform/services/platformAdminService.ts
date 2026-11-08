@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { env } from '@/lib/env';
-import { PlatformMetrics, PlatformOrganization, PlatformAuditLog } from '../types';
+import { PlatformMetrics, PlatformOrganization, PlatformAuditLog, UsageRecord, WebhookEvent } from '../types';
 
 const isMock = (): boolean => !env.isConfigured || env.isMockAuthEnabled;
 
@@ -287,6 +287,65 @@ export const platformAdminService = {
       return (data || []) as PlatformAuditLog[];
     } catch {
       return [...mockAuditLogs];
+    }
+  },
+
+  /**
+   * Fetch metered usage records for a tenant (orders, branches, users, storage).
+   */
+  async getUsageRecords(organizationId?: string): Promise<UsageRecord[]> {
+    if (isMock()) {
+      const today = new Date().toISOString().split('T')[0];
+      const periodStart = new Date(Date.now() - 29 * 86400000).toISOString().split('T')[0];
+      const orgForMock = organizationId || mockOrganizations[0]?.id || '11111111-1111-1111-1111-111111111111';
+      return [
+        { id: 'usage-001', organization_id: orgForMock, period_start: periodStart, period_end: today, metric: 'orders', quantity: 512, created_at: new Date().toISOString() },
+        { id: 'usage-002', organization_id: orgForMock, period_start: periodStart, period_end: today, metric: 'branches', quantity: 2, created_at: new Date().toISOString() },
+        { id: 'usage-003', organization_id: orgForMock, period_start: periodStart, period_end: today, metric: 'storage_mb', quantity: 184.5, created_at: new Date().toISOString() },
+      ];
+    }
+
+    try {
+      let query = (supabase.from('usage_records') as any)
+        .select('*')
+        .order('period_start', { ascending: false })
+        .limit(100);
+      if (organizationId) query = query.eq('organization_id', organizationId);
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as UsageRecord[];
+    } catch {
+      return [];
+    }
+  },
+
+  /**
+   * Fetch recent billing/provider webhook events (support + reconciliation).
+   */
+  async getWebhookEvents(): Promise<WebhookEvent[]> {
+    if (isMock()) {
+      return [
+        {
+          id: 'wh-001',
+          provider: 'razorpay',
+          event_id: 'evt_mock_001',
+          event_type: 'payment.captured',
+          organization_id: mockOrganizations[0]?.id || null,
+          status: 'processed',
+          received_at: new Date().toISOString(),
+        },
+      ];
+    }
+
+    try {
+      const { data, error } = await (supabase.from('webhook_events') as any)
+        .select('*')
+        .order('received_at', { ascending: false })
+        .limit(50);
+      if (error) throw error;
+      return (data || []) as WebhookEvent[];
+    } catch {
+      return [];
     }
   },
 

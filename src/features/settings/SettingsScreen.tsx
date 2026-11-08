@@ -60,8 +60,10 @@ const ROLE_LABELS: Record<string, string> = {
   general_manager: 'General Manager',
   branch_manager: 'Branch Manager',
   cashier: 'Cashier',
+  waiter: 'Waiter / Front-of-House',
   kitchen: 'Kitchen Staff',
   inventory: 'Inventory Staff',
+  operations: 'Cleaning / Operations',
   auditor: 'Auditor / Accountant',
 };
 

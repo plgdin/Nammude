@@ -1,6 +1,14 @@
 import { supabase } from '@/lib/supabase';
 import { env } from '@/lib/env';
-import { Customer, CustomerFilter } from '../types';
+import {
+  Customer,
+  CustomerFilter,
+  FeedbackRecord,
+  FeedbackStatus,
+  CustomerConsentRecord,
+  ConsentType,
+  PromotionRecord,
+} from '../types';
 
 const isMock = (): boolean => !env.isConfigured || env.isMockAuthEnabled;
 
@@ -191,4 +199,333 @@ export const crmService = {
       .eq('organization_id', orgId);
     if (error) throw error;
   },
+
+  // --- Feedback ---
+  async getFeedback(orgId: string): Promise<FeedbackRecord[]> {
+    if (isMock()) {
+      return localFeedback.filter((f) => f.organization_id === orgId);
+    }
+    try {
+      const { data, error } = await (supabase.from('feedback') as any)
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false });
+      if (!error && data) return data as FeedbackRecord[];
+    } catch (err) {
+      console.warn('[crmService] Failed to load feedback:', err);
+    }
+    return [];
+  },
+
+  async createFeedback(params: {
+    organizationId: string;
+    customerId?: string | null;
+    orderId?: string | null;
+    rating?: number | null;
+    comment?: string | null;
+    channel?: string;
+  }): Promise<{ success: boolean; feedback?: FeedbackRecord; error?: string }> {
+    if (params.rating !== undefined && params.rating !== null) {
+      if (!Number.isInteger(params.rating) || params.rating < 1 || params.rating > 5) {
+        return { success: false, error: 'Rating must be a whole number between 1 and 5.' };
+      }
+    }
+    if (!params.comment || params.comment.trim().length < 3) {
+      return { success: false, error: 'Feedback comment is required.' };
+    }
+
+    if (isMock()) {
+      const feedback: FeedbackRecord = {
+        id: `fb-${Date.now()}`,
+        organization_id: params.organizationId,
+        customer_id: params.customerId || null,
+        order_id: params.orderId || null,
+        rating: params.rating ?? null,
+        comment: params.comment.trim(),
+        channel: params.channel || 'in_store',
+        status: 'new',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      localFeedback.unshift(feedback);
+      return { success: true, feedback };
+    }
+
+    try {
+      const { data, error } = await (supabase.from('feedback') as any)
+        .insert({
+          organization_id: params.organizationId,
+          customer_id: params.customerId || null,
+          order_id: params.orderId || null,
+          rating: params.rating ?? null,
+          comment: params.comment.trim(),
+          channel: params.channel || 'in_store',
+          status: 'new',
+        })
+        .select()
+        .single();
+      if (error) return { success: false, error: error.message };
+      return { success: true, feedback: data as FeedbackRecord };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to record feedback.' };
+    }
+  },
+
+  async updateFeedbackStatus(
+    feedbackId: string,
+    status: FeedbackStatus
+  ): Promise<{ success: boolean; error?: string }> {
+    if (isMock()) {
+      const target = localFeedback.find((f) => f.id === feedbackId);
+      if (!target) return { success: false, error: 'Feedback not found.' };
+      target.status = status;
+      target.updated_at = new Date().toISOString();
+      return { success: true };
+    }
+    try {
+      const { error } = await (supabase.from('feedback') as any)
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', feedbackId);
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update feedback.' };
+    }
+  },
+
+  // --- Consents ---
+  async getConsents(orgId: string, customerId: string): Promise<CustomerConsentRecord[]> {
+    if (isMock()) {
+      return localConsents.filter((c) => c.customer_id === customerId);
+    }
+    try {
+      const { data, error } = await (supabase.from('customer_consents') as any)
+        .select('*')
+        .eq('organization_id', orgId)
+        .eq('customer_id', customerId);
+      if (!error && data) return data as CustomerConsentRecord[];
+    } catch (err) {
+      console.warn('[crmService] Failed to load consents:', err);
+    }
+    return [];
+  },
+
+  async setConsent(params: {
+    organizationId: string;
+    customerId: string;
+    consentType: ConsentType;
+    granted: boolean;
+    source?: string | null;
+  }): Promise<{ success: boolean; error?: string }> {
+    if (isMock()) {
+      const existing = localConsents.find(
+        (c) => c.customer_id === params.customerId && c.consent_type === params.consentType
+      );
+      if (existing) {
+        existing.granted = params.granted;
+        existing.granted_at = params.granted ? new Date().toISOString() : null;
+        existing.source = params.source || existing.source;
+        existing.updated_at = new Date().toISOString();
+      } else {
+        localConsents.push({
+          id: `consent-${Date.now()}`,
+          organization_id: params.organizationId,
+          customer_id: params.customerId,
+          consent_type: params.consentType,
+          granted: params.granted,
+          granted_at: params.granted ? new Date().toISOString() : null,
+          source: params.source || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+      return { success: true };
+    }
+
+    try {
+      const { error } = await (supabase.from('customer_consents') as any).upsert(
+        {
+          organization_id: params.organizationId,
+          customer_id: params.customerId,
+          consent_type: params.consentType,
+          granted: params.granted,
+          granted_at: params.granted ? new Date().toISOString() : null,
+          source: params.source || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'customer_id,consent_type' }
+      );
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update consent.' };
+    }
+  },
+
+  // --- Promotions ---
+  async getPromotions(orgId: string): Promise<PromotionRecord[]> {
+    if (isMock()) {
+      return localPromotions.filter((p) => p.organization_id === orgId);
+    }
+    try {
+      const { data, error } = await (supabase.from('promotions') as any)
+        .select('*')
+        .eq('organization_id', orgId)
+        .order('created_at', { ascending: false });
+      if (!error && data) return data as PromotionRecord[];
+    } catch (err) {
+      console.warn('[crmService] Failed to load promotions:', err);
+    }
+    return [];
+  },
+
+  async createPromotion(params: {
+    organizationId: string;
+    name: string;
+    code: string;
+    discountType: 'percent' | 'fixed';
+    discountValue: number;
+    minOrderValue?: number;
+    endsAt?: string | null;
+    usageLimit?: number | null;
+  }): Promise<{ success: boolean; promotion?: PromotionRecord; error?: string }> {
+    const name = params.name.trim();
+    const code = params.code.trim().toUpperCase();
+    if (name.length < 2) return { success: false, error: 'Promotion name is required.' };
+    if (!/^[A-Z0-9-]{3,}$/.test(code)) {
+      return { success: false, error: 'Promo code must be at least 3 characters (letters, numbers, hyphens).' };
+    }
+    if (!Number.isFinite(params.discountValue) || params.discountValue <= 0) {
+      return { success: false, error: 'Discount value must be greater than zero.' };
+    }
+    if (params.discountType === 'percent' && params.discountValue > 100) {
+      return { success: false, error: 'Percent discount cannot exceed 100.' };
+    }
+
+    if (isMock()) {
+      const duplicate = localPromotions.find(
+        (p) => p.organization_id === params.organizationId && p.code === code
+      );
+      if (duplicate) return { success: false, error: 'A promotion with this code already exists.' };
+      const promotion: PromotionRecord = {
+        id: `promo-${Date.now()}`,
+        organization_id: params.organizationId,
+        name,
+        code,
+        discount_type: params.discountType,
+        discount_value: params.discountValue,
+        min_order_value: params.minOrderValue || 0,
+        starts_at: new Date().toISOString(),
+        ends_at: params.endsAt || null,
+        is_active: true,
+        usage_limit: params.usageLimit || null,
+        used_count: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      localPromotions.unshift(promotion);
+      return { success: true, promotion };
+    }
+
+    try {
+      const { data, error } = await (supabase.from('promotions') as any)
+        .insert({
+          organization_id: params.organizationId,
+          name,
+          code,
+          discount_type: params.discountType,
+          discount_value: params.discountValue,
+          min_order_value: params.minOrderValue || 0,
+          ends_at: params.endsAt || null,
+          is_active: true,
+          usage_limit: params.usageLimit || null,
+          used_count: 0,
+        })
+        .select()
+        .single();
+      if (error) {
+        return {
+          success: false,
+          error: error.message.includes('uq_promotion_code')
+            ? 'A promotion with this code already exists.'
+            : error.message,
+        };
+      }
+      return { success: true, promotion: data as PromotionRecord };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to create promotion.' };
+    }
+  },
+
+  async togglePromotion(promotionId: string, isActive: boolean): Promise<{ success: boolean; error?: string }> {
+    if (isMock()) {
+      const target = localPromotions.find((p) => p.id === promotionId);
+      if (!target) return { success: false, error: 'Promotion not found.' };
+      target.is_active = isActive;
+      target.updated_at = new Date().toISOString();
+      return { success: true };
+    }
+    try {
+      const { error } = await (supabase.from('promotions') as any)
+        .update({ is_active: isActive, updated_at: new Date().toISOString() })
+        .eq('id', promotionId);
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update promotion.' };
+    }
+  },
+
+  /**
+   * Validate a promo code for an order total (read-only check).
+   */
+  async validatePromotionCode(
+    orgId: string,
+    code: string,
+    orderTotal: number
+  ): Promise<{ valid: boolean; discount: number; error?: string }> {
+    const promotions = await this.getPromotions(orgId);
+    const promo = promotions.find((p) => p.code === code.trim().toUpperCase());
+    if (!promo) return { valid: false, discount: 0, error: 'Invalid promo code.' };
+    if (!promo.is_active) return { valid: false, discount: 0, error: 'Promo code is not active.' };
+    const now = new Date();
+    if (new Date(promo.starts_at) > now) return { valid: false, discount: 0, error: 'Promo code has not started yet.' };
+    if (promo.ends_at && new Date(promo.ends_at) < now) {
+      return { valid: false, discount: 0, error: 'Promo code has expired.' };
+    }
+    if (promo.usage_limit !== null && promo.used_count >= promo.usage_limit) {
+      return { valid: false, discount: 0, error: 'Promo code usage limit reached.' };
+    }
+    if (orderTotal < promo.min_order_value) {
+      return {
+        valid: false,
+        discount: 0,
+        error: `Requires minimum order value of ${promo.min_order_value}.`,
+      };
+    }
+    const discount =
+      promo.discount_type === 'percent'
+        ? Number((orderTotal * (promo.discount_value / 100)).toFixed(2))
+        : Number(Math.min(promo.discount_value, orderTotal).toFixed(2));
+    return { valid: true, discount };
+  },
 };
+
+let localFeedback: FeedbackRecord[] = [
+  {
+    id: 'fb-00000000-0000-0000-0000-000000000001',
+    organization_id: '11111111-1111-1111-1111-111111111111',
+    customer_id: 'cust-001',
+    order_id: null,
+    rating: 5,
+    comment: 'Best flat white in the city. The patio seating is lovely.',
+    channel: 'in_store',
+    status: 'new',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+];
+
+let localConsents: CustomerConsentRecord[] = [];
+
+let localPromotions: PromotionRecord[] = [];
