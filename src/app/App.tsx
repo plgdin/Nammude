@@ -86,6 +86,11 @@ const SettingsScreen = lazy(() =>
     default: m.SettingsScreen,
   }))
 );
+const ReservationsScreen = lazy(() =>
+  import('@/features/reservations/ReservationsScreen').then((m) => ({
+    default: m.ReservationsScreen,
+  }))
+);
 
 // Loading Fallback
 const RouteLoadingFallback: React.FC = () => (
@@ -248,6 +253,14 @@ export const App: React.FC = () => {
                 }
               />
               <Route path="/crm" element={<Navigate to="/customers" replace />} />
+              <Route
+                path="/reservations"
+                element={
+                  <Suspense fallback={<RouteLoadingFallback />}>
+                    <ReservationsScreen />
+                  </Suspense>
+                }
+              />
               <Route
                 path="/settings"
                 element={

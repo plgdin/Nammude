@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/Badge';
 import { financialReportService } from './services/financialReportService';
 import { expenseService } from './services/expenseService';
 import { cashShiftService } from './services/cashShiftService';
+import { orderService } from '@/features/pos/services/orderService';
+import { buildInvoice, buildInvoiceNumber, GstInvoice, invoiceToText, ordersToGstr1Csv, invoicesToTallyXml } from './services/gstInvoiceService';
 import { FinancialReport, ExpenseRecord, CashShiftRecord } from './types';
 import { ExpenseModal } from './ExpenseModal';
 import { CashShiftModal } from './CashShiftModal';
@@ -34,13 +36,16 @@ export const FinancialsScreen: React.FC = () => {
 
   const [dateRange, setDateRange] = useState<'today' | '7days' | '30days'>('30days');
   const [selectedBranchId, setSelectedBranchId] = useState<string>(selectedBranch?.id || '');
-  const [activeTab, setActiveTab] = useState<'statement' | 'cash_shifts' | 'expenses' | 'tenders_payables'>('statement');
+  const [activeTab, setActiveTab] = useState<'statement' | 'cash_shifts' | 'expenses' | 'tenders_payables' | 'gst_tally'>('statement');
 
   const [report, setReport] = useState<FinancialReport | null>(null);
   const [expenses, setExpenses] = useState<ExpenseRecord[]>([]);
   const [activeShift, setActiveShift] = useState<CashShiftRecord | null>(null);
   const [shiftHistory, setShiftHistory] = useState<CashShiftRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [gstInvoices, setGstInvoices] = useState<GstInvoice[]>([]);
+  const [gstLoading, setGstLoading] = useState<boolean>(false);
+  const [gstPreview, setGstPreview] = useState<string | null>(null);
 
   // Modal states
   const [isExpenseModalOpen, setIsExpenseModalOpen] = useState<boolean>(false);
@@ -94,6 +99,94 @@ export const FinancialsScreen: React.FC = () => {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  const loadGstInvoices = useCallback(async () => {
+    setGstLoading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      let start = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+      if (dateRange === 'today') start = today;
+      else if (dateRange === '7days') start = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
+
+      const branchId = effectiveBranchId === 'ALL' ? null : effectiveBranchId;
+      const orders = await orderService.getOrdersForReport({
+        organizationId: orgId,
+        branchId,
+        startDate: start,
+        endDate: today,
+      });
+
+      const completed = orders.filter((o) => o.status === 'completed' || o.status === 'served');
+
+      const supplier: { name: string; gstin?: string | null; address?: string | null; state?: string | null } = {
+        name: currentOrganization?.legal_name || currentOrganization?.name || 'Restaurant',
+        gstin: currentOrganization?.gstin,
+        address: selectedBranch?.address || null,
+        state: currentOrganization?.place_of_supply_state,
+      };
+
+      const built: GstInvoice[] = [];
+      let seq = 1;
+      for (const o of completed) {
+        const items = await orderService.getOrderItemsForOrders([o.id]);
+        const recipientState = currentOrganization?.place_of_supply_state;
+        const recipient = {
+          name: 'Walk-in Customer',
+          gstin: null as string | null,
+          address: null as string | null,
+          state: recipientState,
+        };
+
+        const branchTaxRate = (selectedBranch as any)?.taxRate ?? 0.0825;
+        const taxRatePercent = Math.round(branchTaxRate * 10000) / 100; // 0.0825 -> 8.25
+
+        const lines = items.length
+          ? items.map((it) => ({
+              description: it.item_name || 'Item',
+              quantity: Number(it.quantity) || 1,
+              unitPrice: Number(it.unit_price) || 0,
+              taxRate: taxRatePercent,
+            }))
+          : [
+              {
+                description: `Order ${o.order_number}`,
+                quantity: 1,
+                unitPrice: Number(o.subtotal_amount) || 0,
+                taxRate: taxRatePercent,
+              },
+            ];
+
+        // Adjust last line unit price so subtotal matches order subtotal (best effort)
+        const inv = buildInvoice({
+          invoiceNumber: buildInvoiceNumber(currentOrganization?.invoice_prefix, new Date(o.created_at), seq++),
+          invoiceDate: o.created_at.split('T')[0],
+          supplier,
+          recipient,
+          lines,
+        });
+
+        // Override grandTotal to order total for consistency (tax already in order)
+        const adjusted: GstInvoice = { ...inv, grandTotal: Number(o.total_amount) };
+        built.push(adjusted);
+      }
+      setGstInvoices(built);
+    } catch (err) {
+      console.error('[FinancialsScreen] GST load failed:', err);
+      setGstInvoices([]);
+    } finally {
+      setGstLoading(false);
+    }
+  }, [orgId, effectiveBranchId, dateRange, currentOrganization, selectedBranch]);
+
+  const handleExportGstr1 = () => {
+    const csv = ordersToGstr1Csv(gstInvoices);
+    downloadText(csv, `gstr1-${dateRange}.csv`, 'text/csv');
+  };
+
+  const handleExportTally = () => {
+    const xml = invoicesToTallyXml(gstInvoices);
+    downloadText(xml, `tally-${dateRange}.xml`, 'application/xml');
+  };
 
   const handleCancelExpense = async (id: string) => {
     if (confirm('Cancel this recorded expense? This will be recorded as a cancellation rather than deleting historical audit trail.')) {
@@ -302,6 +395,20 @@ export const FinancialsScreen: React.FC = () => {
         >
           <CreditCard className="h-4 w-4" />
           Tenders & Supplier Payables
+        </button>
+        <button
+          onClick={() => {
+            setActiveTab('gst_tally');
+            loadGstInvoices();
+          }}
+          className={`flex items-center gap-2 px-3 py-2 font-medium rounded-lg transition-colors whitespace-nowrap ${
+            activeTab === 'gst_tally'
+              ? 'bg-brand/20 text-brand border border-brand/40'
+              : 'text-gray-400 hover:text-white hover:bg-surface-elevated'
+          }`}
+        >
+          <FileSpreadsheet className="h-4 w-4" />
+          GST & Tally Export
         </button>
       </div>
 
@@ -746,6 +853,87 @@ export const FinancialsScreen: React.FC = () => {
         </div>
       )}
 
+      {/* Tab 5: GST & Tally Export */}
+      {activeTab === 'gst_tally' && (
+        <div className="space-y-4">
+          <Card className="p-5 space-y-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <h3 className="text-sm font-bold text-white uppercase tracking-wider font-mono">
+                GST Invoices (completed orders)
+              </h3>
+              <div className="flex gap-2">
+                <Button variant="secondary" size="sm" onClick={loadGstInvoices} disabled={gstLoading}>
+                  <RefreshCw className={`h-4 w-4 ${gstLoading ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                <Button variant="secondary" size="sm" onClick={handleExportGstr1} disabled={gstInvoices.length === 0}>
+                  Export GSTR-1 CSV
+                </Button>
+                <Button variant="primary" size="sm" onClick={handleExportTally} disabled={gstInvoices.length === 0}>
+                  Export Tally XML
+                </Button>
+              </div>
+            </div>
+            {gstLoading ? (
+              <p className="text-xs text-gray-400">Building invoices…</p>
+            ) : gstInvoices.length === 0 ? (
+              <p className="text-xs text-gray-400">No completed orders in the selected window.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs text-left">
+                  <thead className="text-gray-400 border-b border-surface-border">
+                    <tr>
+                      <th className="py-2 px-2">Invoice</th>
+                      <th className="py-2 px-2">Date</th>
+                      <th className="py-2 px-2">Taxable</th>
+                      <th className="py-2 px-2">CGST</th>
+                      <th className="py-2 px-2">SGST</th>
+                      <th className="py-2 px-2">IGST</th>
+                      <th className="py-2 px-2">Total</th>
+                      <th className="py-2 px-2">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gstInvoices.map((inv) => (
+                      <tr key={inv.invoiceNumber} className="border-b border-surface-border/50">
+                        <td className="py-2 px-2 font-mono text-white">{inv.invoiceNumber}</td>
+                        <td className="py-2 px-2 text-gray-300">{inv.invoiceDate}</td>
+                        <td className="py-2 px-2 text-gray-300">{formatCurrency(inv.subtotal)}</td>
+                        <td className="py-2 px-2 text-gray-300">{formatCurrency(inv.cgstTotal)}</td>
+                        <td className="py-2 px-2 text-gray-300">{formatCurrency(inv.sgstTotal)}</td>
+                        <td className="py-2 px-2 text-gray-300">{formatCurrency(inv.igstTotal)}</td>
+                        <td className="py-2 px-2 font-bold text-white">{formatCurrency(inv.grandTotal)}</td>
+                        <td className="py-2 px-2">
+                          <button
+                            className="text-brand hover:underline"
+                            onClick={() => setGstPreview(invoiceToText(inv))}
+                          >
+                            Preview
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            {gstPreview && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-gray-300">Invoice Preview</span>
+                  <button className="text-xs text-gray-400 hover:text-white" onClick={() => setGstPreview(null)}>
+                    Close
+                  </button>
+                </div>
+                <pre className="bg-canvas border border-surface-border rounded-lg p-3 text-[11px] text-gray-200 overflow-auto whitespace-pre">
+                  {gstPreview}
+                </pre>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
       {/* Expense Modal */}
       <ExpenseModal
         isOpen={isExpenseModalOpen}
@@ -768,3 +956,15 @@ export const FinancialsScreen: React.FC = () => {
     </div>
   );
 };
+
+function downloadText(content: string, filename: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

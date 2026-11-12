@@ -14,6 +14,12 @@ The following items are documented release limitations for Release Candidate 1:
 - **Platform**: metered usage records and billing webhook event visibility (`/platform-admin` → Usage & Webhooks).
 - **Ops**: CI workflow (typecheck + tests + build), Vercel deploy config with SPA fallback, PWA app-shell service worker (production only).
 - **Schema**: migration `20261024000009_staff_inventory_crm_platform.sql` adds employees, shifts, attendance, compliance, stock counts, wastage, supplier invoices, feedback, consents, promotions, usage, webhooks (all RLS-enabled).
+- **Parity pack (2026-10-25)**: migration `20261025000010_parity_pack.sql` adds organization compliance/billing fields (UPI VPA, GSTIN, legal name, FSSAI, invoice prefix, place of supply) and a `reservations` table with RLS.
+- **UPI QR**: dynamic QR generation from a configured VPA via `qrcode`, rendered in the payment modal for UPI tenders.
+- **GST & Tally**: GST invoice builder with CGST/SGST vs IGST split, GSTR-1 CSV export and Tally XML export in Financials.
+- **Thermal receipts**: ESC/POS byte-stream builder and 58/80mm text receipt generator; download from payment success state.
+- **Reservations**: new `/reservations` screen with booking, confirmation, seating, completion, cancellation.
+- **Offline order queue**: orders placed while offline are queued in localStorage and flushed automatically on reconnect.
 
 ## 1. Authentication Live Verification
 - **Status**: **BLOCKED — REQUIRES LIVE VERIFICATION**.
@@ -29,7 +35,7 @@ The following items are documented release limitations for Release Candidate 1:
 
 ## 4. Still Outstanding (Post-RC-1)
 - **Live verification**: migrations 1–9 never executed against a live database; auth (GoTrue) fix unproven; RLS tests are still JS simulations, not DB-backed.
-- **Offline POS**: PWA caches the app shell only — financial posting remains online-only by design.
-- **Hardware**: thermal printer/USB/network, cash drawer, barcode scanner untested; printing is browser print dialog only.
+- **Offline POS**: PWA caches the app shell only; order creation now queues locally and syncs on reconnect, but payment posting and inventory reconciliation remain online-only by design.
+- **Hardware**: thermal printer/USB/network, cash drawer, barcode scanner untested; software now emits ESC/POS streams, but physical device integration is unverified. Printing still falls back to the browser print dialog.
 - **Rate limiting, backups/PITR drills, monitoring/alerts**: not implemented (no Edge Functions, no backup verification).
 - **Settings staff tab** still uses seed fixtures; the employee roster of record is the Staff screen (`/staff`).

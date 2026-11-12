@@ -101,6 +101,12 @@ export const SettingsScreen: React.FC = () => {
   const [timezone, setTimezone] = useState(currentOrganization?.timezone || 'Asia/Kolkata');
   const [currency, setCurrency] = useState(currentOrganization?.default_currency || 'INR');
   const [brandColor, setBrandColor] = useState(currentOrganization?.branding?.brandColor || '#2563eb');
+  const [upiVpa, setUpiVpa] = useState(currentOrganization?.upi_vpa || '');
+  const [gstin, setGstin] = useState(currentOrganization?.gstin || '');
+  const [legalName, setLegalName] = useState(currentOrganization?.legal_name || '');
+  const [fssaiLicense, setFssaiLicense] = useState(currentOrganization?.fssai_license || '');
+  const [invoicePrefix, setInvoicePrefix] = useState(currentOrganization?.invoice_prefix || 'INV');
+  const [placeOfSupply, setPlaceOfSupply] = useState(currentOrganization?.place_of_supply_state || '');
 
   // Keep the form in sync when the active organization changes.
   useEffect(() => {
@@ -110,6 +116,12 @@ export const SettingsScreen: React.FC = () => {
     setTimezone(currentOrganization.timezone || 'Asia/Kolkata');
     setCurrency(currentOrganization.default_currency || 'INR');
     setBrandColor(currentOrganization.branding?.brandColor || '#2563eb');
+    setUpiVpa(currentOrganization.upi_vpa || '');
+    setGstin(currentOrganization.gstin || '');
+    setLegalName(currentOrganization.legal_name || '');
+    setFssaiLicense(currentOrganization.fssai_license || '');
+    setInvoicePrefix(currentOrganization.invoice_prefix || 'INV');
+    setPlaceOfSupply(currentOrganization.place_of_supply_state || '');
   }, [currentOrganization?.id]);
 
   // Load real dining tables for QR codes.
@@ -194,6 +206,12 @@ export const SettingsScreen: React.FC = () => {
       default_currency: currency,
       brandColor,
       accentColor: currentOrganization.branding?.accentColor,
+      upi_vpa: upiVpa,
+      gstin,
+      legal_name: legalName,
+      fssai_license: fssaiLicense,
+      invoice_prefix: invoicePrefix,
+      place_of_supply_state: placeOfSupply,
     });
     setIsSaving(false);
     if (!result.success) {
@@ -328,6 +346,68 @@ export const SettingsScreen: React.FC = () => {
                     className="h-10 w-14 rounded-lg border border-surface-border cursor-pointer bg-transparent"
                   />
                   <span className="text-xs text-gray-300 font-mono">{brandColor}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-surface-border pt-4 space-y-3">
+                <p className="text-xs font-semibold text-gray-300">India Compliance & Billing</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">UPI ID (VPA)</label>
+                    <input
+                      type="text"
+                      value={upiVpa}
+                      onChange={(e) => setUpiVpa(e.target.value)}
+                      placeholder="merchant@upi"
+                      className="w-full bg-surface-elevated border border-surface-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">GSTIN</label>
+                    <input
+                      type="text"
+                      value={gstin}
+                      onChange={(e) => setGstin(e.target.value)}
+                      placeholder="29ABCDE1234F1Z5"
+                      className="w-full bg-surface-elevated border border-surface-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Legal Name</label>
+                    <input
+                      type="text"
+                      value={legalName}
+                      onChange={(e) => setLegalName(e.target.value)}
+                      className="w-full bg-surface-elevated border border-surface-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">FSSAI License</label>
+                    <input
+                      type="text"
+                      value={fssaiLicense}
+                      onChange={(e) => setFssaiLicense(e.target.value)}
+                      className="w-full bg-surface-elevated border border-surface-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Invoice Prefix</label>
+                    <input
+                      type="text"
+                      value={invoicePrefix}
+                      onChange={(e) => setInvoicePrefix(e.target.value)}
+                      className="w-full bg-surface-elevated border border-surface-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-400 mb-1.5">Place of Supply (State)</label>
+                    <input
+                      type="text"
+                      value={placeOfSupply}
+                      onChange={(e) => setPlaceOfSupply(e.target.value)}
+                      className="w-full bg-surface-elevated border border-surface-border rounded-lg px-3 py-2.5 text-sm text-white focus:outline-none focus:border-brand"
+                    />
+                  </div>
                 </div>
               </div>
 

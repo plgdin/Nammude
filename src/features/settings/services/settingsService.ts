@@ -10,6 +10,12 @@ export interface OrganizationSettingsUpdate {
   default_currency: string;
   brandColor: string;
   accentColor?: string;
+  upi_vpa?: string;
+  gstin?: string;
+  legal_name?: string;
+  fssai_license?: string;
+  invoice_prefix?: string;
+  place_of_supply_state?: string;
 }
 
 export const ORG_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -64,6 +70,12 @@ export const settingsService = {
             default_currency: settings.default_currency,
             currency_symbol: currencySymbols[settings.default_currency] || settings.default_currency,
             branding,
+            upi_vpa: settings.upi_vpa ?? null,
+            gstin: settings.gstin ?? null,
+            legal_name: settings.legal_name ?? null,
+            fssai_license: settings.fssai_license ?? null,
+            invoice_prefix: settings.invoice_prefix ?? null,
+            place_of_supply_state: settings.place_of_supply_state ?? null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', organizationId)
@@ -89,6 +101,12 @@ export const settingsService = {
     seedOrg.default_currency = settings.default_currency;
     seedOrg.currency_symbol = currencySymbols[settings.default_currency] || settings.default_currency;
     seedOrg.branding = branding;
+    seedOrg.upi_vpa = settings.upi_vpa ?? seedOrg.upi_vpa ?? null;
+    seedOrg.gstin = settings.gstin ?? seedOrg.gstin ?? null;
+    seedOrg.legal_name = settings.legal_name ?? seedOrg.legal_name ?? null;
+    seedOrg.fssai_license = settings.fssai_license ?? seedOrg.fssai_license ?? null;
+    seedOrg.invoice_prefix = settings.invoice_prefix ?? seedOrg.invoice_prefix ?? null;
+    seedOrg.place_of_supply_state = settings.place_of_supply_state ?? seedOrg.place_of_supply_state ?? null;
     seedOrg.updated_at = new Date().toISOString();
 
     return { success: true, organization: seedOrg };

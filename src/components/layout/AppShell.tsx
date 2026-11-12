@@ -71,6 +71,11 @@ export const AppShell: React.FC = () => {
           title: 'Customer CRM',
           subtitle: `${currentOrganization?.name || 'Restaurant'} • Customer profiles & loyalty`,
         };
+      case '/reservations':
+        return {
+          title: 'Reservations',
+          subtitle: `${currentBranch?.name || 'Main Branch'} • Table bookings & seating`,
+        };
       case '/onboarding':
         return {
           title: 'Restaurant Setup',

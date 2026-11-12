@@ -9,6 +9,7 @@ import { TableQrModal } from './TableQrModal';
 import { menuService } from './services/menuService';
 import { tableService } from './services/tableService';
 import { orderService } from './services/orderService';
+import { offlineQueue } from './services/offlineQueue';
 import {
   MenuCategoryRecord,
   MenuItemWithModifiers,
@@ -74,6 +75,20 @@ export const PosScreen: React.FC = () => {
       // storage unavailable — held carts are session-only
     }
   }, [heldCarts, activeBranch?.id]);
+
+  useEffect(() => {
+    const flush = async () => {
+      if (!offlineQueue.isOnline()) return;
+      if (offlineQueue.getPending().length === 0) return;
+      const result = await offlineQueue.flush();
+      if (result.processed > 0) {
+        setOrderSuccessBanner(`Synced ${result.processed} offline order(s).`);
+      }
+    };
+    window.addEventListener('online', flush);
+    flush();
+    return () => window.removeEventListener('online', flush);
+  }, []);
 
   // Modals
   const [modifierItem, setModifierItem] = useState<MenuItemWithModifiers | null>(null);
@@ -269,7 +284,7 @@ export const PosScreen: React.FC = () => {
     const targetTable = tables.find((t) => t.table_number === selectedTable);
     const idempotencyKey = `ord-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`;
 
-    const res = await orderService.createOrder({
+    const payload = {
       organization_id: currentOrganization.id,
       branch_id: activeBranch.id,
       order_type: orderType,
@@ -284,7 +299,17 @@ export const PosScreen: React.FC = () => {
         special_instructions: line.special_instructions,
         selected_modifiers: line.selected_modifiers,
       })),
-    });
+    };
+
+    if (!offlineQueue.isOnline()) {
+      offlineQueue.enqueue(payload as any);
+      setIsSubmittingOrder(false);
+      setOrderSuccessBanner(`Order queued offline (${idempotencyKey}). Will sync when connection returns.`);
+      clearCart();
+      return;
+    }
+
+    const res = await orderService.createOrder(payload as any);
 
     setIsSubmittingOrder(false);
 

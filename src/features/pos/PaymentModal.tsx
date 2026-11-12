@@ -6,6 +6,8 @@ import { CreditCard, Banknote, QrCode, CheckCircle2, ArrowRight, AlertTriangle, 
 import { paymentService } from './services/paymentService';
 import { useOrganization } from '@/features/organization/OrganizationContext';
 import { useAuth } from '@/features/auth/AuthContext';
+import { buildUpiUri, generateUpiQrDataUrl, isValidVpa } from '@/lib/upi';
+import { downloadEscPos, ReceiptData } from './services/receiptBuilder';
 
 export interface ReceiptItem {
   name: string;
@@ -46,6 +48,8 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [upiQrDataUrl, setUpiQrDataUrl] = useState<string | null>(null);
+  const [upiError, setUpiError] = useState<string | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
 
   const remaining = Math.max(0, roundMoney(totalPayable - paidSoFar));
@@ -69,6 +73,50 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       });
     }
   }, [isOpen, orderId, totalPayable]);
+
+  // Generate a dynamic UPI QR for the digital tender method.
+  useEffect(() => {
+    if (!isOpen || method !== 'upi_qr') {
+      setUpiQrDataUrl(null);
+      setUpiError(null);
+      return;
+    }
+    const vpa = (currentOrganization as any)?.upi_vpa;
+    if (!isValidVpa(vpa || '')) {
+      setUpiQrDataUrl(null);
+      setUpiError('Configure a UPI ID in Settings to enable QR payments.');
+      return;
+    }
+    const uri = buildUpiUri({
+      pa: vpa,
+      pn: currentOrganization?.name || 'Restaurant',
+      am: amountToPay > 0 ? amountToPay : remaining,
+      tn: `Order ${orderNumber}`,
+      tr: orderId || orderNumber,
+    });
+    if (!uri) {
+      setUpiQrDataUrl(null);
+      setUpiError('Unable to build UPI payment link.');
+      return;
+    }
+    let cancelled = false;
+    generateUpiQrDataUrl(uri)
+      .then((dataUrl) => {
+        if (!cancelled) {
+          setUpiQrDataUrl(dataUrl);
+          setUpiError(null);
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setUpiQrDataUrl(null);
+          setUpiError(err?.message || 'Failed to render UPI QR.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, method, currentOrganization, amountToPay, remaining, orderNumber, orderId]);
 
   const handleProcessPayment = async () => {
     if (amountToPay <= 0) {
@@ -232,6 +280,28 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               </button>
             </div>
 
+            {/* UPI QR Display */}
+            {method === 'upi_qr' && (
+              <div className="flex flex-col items-center gap-2 p-3.5 rounded-xl border border-surface-border bg-surface-elevated">
+                {upiQrDataUrl ? (
+                  <>
+                    <img
+                      src={upiQrDataUrl}
+                      alt="UPI QR code"
+                      className="h-[220px] w-[220px] rounded-lg bg-white p-2"
+                    />
+                    <p className="text-[11px] text-gray-400 text-center">
+                      Scan with any UPI app to pay {formatCurrency(amountToPay > 0 ? amountToPay : remaining)}.
+                      <br />
+                      VPA: {(currentOrganization as any)?.upi_vpa}
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-xs text-amber-300 text-center">{upiError || 'Generating QR…'}</p>
+                )}
+              </div>
+            )}
+
             {/* Cash Tender Calculation */}
             {method === 'cash' && (
               <div className="space-y-3 p-3.5 rounded-xl border border-surface-border bg-surface-elevated">
@@ -303,6 +373,38 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
               <Button variant="secondary" className="w-full gap-2" onClick={handlePrint}>
                 <Printer className="h-4 w-4" />
                 <span>Print Receipt</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="w-full gap-2"
+                onClick={() => {
+                  const data: ReceiptData = {
+                    storeName: currentOrganization?.name || 'Restaurant',
+                    branchName: currentBranch?.name,
+                    gstin: (currentOrganization as any)?.gstin || undefined,
+                    fssai: (currentOrganization as any)?.fssai_license || undefined,
+                    orderNumber,
+                    orderType,
+                    tableNumber,
+                    dateTime: new Date().toLocaleString(),
+                    items: receiptItems.map((i) => ({
+                      name: i.name,
+                      quantity: i.quantity,
+                      unitPrice: i.quantity ? i.lineTotal / i.quantity : 0,
+                      lineTotal: i.lineTotal,
+                    })),
+                    subtotal: receiptItems.reduce((s, i) => s + i.lineTotal, 0),
+                    tax: 0,
+                    total: totalPayable,
+                    paid: paidSoFar,
+                    method,
+                    change: changeDue,
+                  };
+                  downloadEscPos(data, `receipt-${orderNumber}.bin`);
+                }}
+              >
+                <Printer className="h-4 w-4" />
+                <span>Download ESC/POS (Thermal)</span>
               </Button>
               <Button variant="primary" className="w-full gap-2" onClick={handleFinish}>
                 <span>Complete Order</span>
